@@ -1,0 +1,2783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PackPath — Find Your Route</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=Libre+Baskerville:ital@0;1&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pine: #1E3A2F;
+    --pine-mid: #2D5240;
+    --pine-light: #3D6B54;
+    --moss: #5C7A4E;
+    --lichen: #8FA67A;
+    --sage: #C5D4B2;
+    --cream: #F4F0E6;
+    --parchment: #EAE4D4;
+    --stone: #9B9080;
+    --bark: #6B4F3A;
+    --ember: #C4622D;
+    --sky: #4A7FA5;
+    --text-dark: #1A1A18;
+    --text-mid: #4A4840;
+    --text-light: #7A7668;
+    --white: #FDFCF8;
+    --shadow: rgba(30,58,47,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Source Sans 3', sans-serif;
+    background: var(--cream);
+    color: var(--text-dark);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    background: var(--pine);
+    position: relative;
+    overflow: hidden;
+    padding: 56px 24px 48px;
+    text-align: center;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 120% 60% at 50% 120%, rgba(61,107,84,0.5) 0%, transparent 70%),
+      repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 40px,
+        rgba(255,255,255,0.015) 40px,
+        rgba(255,255,255,0.015) 41px
+      );
+  }
+
+  .hero-eyebrow {
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--lichen);
+    margin-bottom: 14px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .hero-eyebrow::before,
+  .hero-eyebrow::after {
+    content: '';
+    width: 28px;
+    height: 1px;
+    background: var(--lichen);
+    opacity: 0.5;
+  }
+
+  .hero-logo {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(42px, 10vw, 58px);
+    color: var(--white);
+    letter-spacing: -1px;
+    line-height: 1;
+    position: relative;
+    margin-bottom: 6px;
+  }
+
+  .hero-logo span {
+    color: var(--lichen);
+  }
+
+  .hero-tagline {
+    font-family: 'Libre Baskerville', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: rgba(245,240,230,0.65);
+    position: relative;
+    margin-bottom: 32px;
+  }
+
+  .hero-pain-points {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    max-width: 360px;
+    margin: 0 auto;
+  }
+
+  .pain-point {
+    background: rgba(255,255,255,0.07);
+    border: 0.5px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 13px;
+    color: rgba(245,240,230,0.8);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+  }
+
+  .pain-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap {
+    background: var(--pine-mid);
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+
+  .progress-steps {
+    display: flex;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .step-tab {
+    flex: 1;
+    padding: 13px 4px 11px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(197,212,178,0.45);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .step-tab.active {
+    color: var(--sage);
+    border-bottom-color: var(--lichen);
+  }
+
+  .step-tab.done {
+    color: var(--lichen);
+  }
+
+  /* ── FORM CONTAINER ── */
+  .form-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 28px 20px 100px;
+  }
+
+  /* ── SECTION CARD ── */
+  .form-section {
+    background: var(--white);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px var(--shadow);
+    border: 0.5px solid rgba(30,58,47,0.08);
+    animation: slideUp 0.3s ease both;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-header {
+    padding: 16px 20px 14px;
+    border-bottom: 0.5px solid var(--parchment);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--parchment);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--pine);
+    line-height: 1.2;
+  }
+
+  .section-subtitle {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 1px;
+  }
+
+  .section-body {
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ── FIELD ── */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+
+  .field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .field-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-light);
+    font-style: italic;
+  }
+
+  .field input[type="text"],
+  .field input[type="number"],
+  .field select,
+  .field textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--parchment);
+    border-radius: 10px;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 15px;
+    color: var(--text-dark);
+    background: var(--cream);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+    outline: none;
+  }
+
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: var(--pine-light);
+    box-shadow: 0 0 0 3px rgba(61,107,84,0.1);
+  }
+
+  .field textarea {
+    height: 80px;
+    resize: none;
+    line-height: 1.5;
+  }
+
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235C7A4E' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 38px;
+  }
+
+  /* ── SLIDER ── */
+  .slider-wrap { display: flex; align-items: center; gap: 12px; }
+
+  .slider-wrap input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--parchment);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .slider-wrap input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--pine-light);
+    border: 3px solid var(--white);
+    box-shadow: 0 1px 4px var(--shadow);
+    cursor: pointer;
+  }
+
+  .slider-track {
+    position: relative;
+    flex: 1;
+  }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 10px;
+    color: var(--text-light);
+  }
+
+  .slider-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--pine);
+    min-width: 52px;
+    text-align: right;
+    line-height: 1;
+  }
+
+  /* ── TOGGLE CHIPS ── */
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  .chip {
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--parchment);
+    background: var(--cream);
+    color: var(--text-mid);
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .chip.active {
+    background: var(--pine);
+    border-color: var(--pine);
+    color: var(--white);
+  }
+
+  .chip.active.scenery { background: var(--moss); border-color: var(--moss); }
+  .chip.active.water { background: var(--sky); border-color: var(--sky); }
+  .chip.active.concern { background: var(--bark); border-color: var(--bark); }
+
+  /* ── TOGGLE ROW ── */
+  .toggle-row {
+    display: flex;
+    background: var(--cream);
+    border: 1px solid var(--parchment);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 3px;
+  }
+
+  .toggle-opt {
+    flex: 1;
+    padding: 9px 6px;
+    text-align: center;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-mid);
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .toggle-opt.active {
+    background: var(--pine);
+    color: var(--white);
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+
+  /* ── CALLOUT ── */
+  .callout {
+    background: var(--parchment);
+    border-left: 3px solid var(--lichen);
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.5;
+  }
+
+  .callout strong { color: var(--pine); }
+
+  /* ── CONCERN TAGS ── */
+  .concern-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+  }
+
+  .concern-chip {
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--parchment);
+    background: var(--cream);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .concern-chip.active {
+    background: #f7ede8;
+    border-color: #d4855a;
+  }
+
+  .concern-chip-icon { font-size: 16px; }
+
+  .concern-chip-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-mid);
+    line-height: 1.3;
+  }
+
+  .concern-chip.active .concern-chip-text { color: #7a3820; }
+
+  /* ── RANGE DISPLAY ── */
+  .range-display {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .range-display input[type="number"] {
+    width: 72px;
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--pine);
+    padding: 8px 4px;
+    border: 1px solid var(--parchment);
+    border-radius: 10px;
+    background: var(--cream);
+    -moz-appearance: textfield;
+    outline: none;
+  }
+
+  .range-display input::-webkit-inner-spin-button,
+  .range-display input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  .range-display input:focus { border-color: var(--pine-light); }
+
+  .range-sep {
+    font-size: 13px;
+    color: var(--text-light);
+  }
+
+  .range-unit {
+    font-size: 13px;
+    color: var(--text-light);
+    font-style: italic;
+  }
+
+  /* ── CHECKBOX LIST ── */
+  .check-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .custom-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--parchment);
+    background: var(--cream);
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .check-item.checked .custom-check {
+    background: var(--pine-light);
+    border-color: var(--pine-light);
+  }
+
+  .check-item.checked .custom-check::after {
+    content: '';
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg) translateY(-1px);
+    display: block;
+  }
+
+  .check-text {
+    font-size: 14px;
+    color: var(--text-dark);
+    line-height: 1.4;
+  }
+
+  .check-sub {
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 1px;
+    font-style: italic;
+  }
+
+  /* ── DIFFICULTY METER ── */
+  .diff-meter {
+    display: flex;
+    gap: 5px;
+    margin-top: 4px;
+  }
+
+  .diff-seg {
+    flex: 1;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--parchment);
+    transition: background 0.2s;
+  }
+
+  .diff-seg.lit { background: var(--pine-light); }
+
+  /* ── ELEV PROFILE PREVIEW ── */
+  .elev-preview {
+    background: var(--parchment);
+    border-radius: 10px;
+    padding: 14px 16px 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .elev-label {
+    font-size: 11px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  .elev-svg { width: 100%; display: block; }
+
+  /* ── HOW IT WORKS ── */
+  .how-it-works {
+    background: var(--pine);
+    border-radius: 16px;
+    padding: 24px 20px;
+    margin-bottom: 16px;
+  }
+
+  .hiw-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .hiw-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .hiw-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .hiw-step-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.1);
+    border: 0.5px solid rgba(255,255,255,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .hiw-step-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--white);
+    margin-bottom: 3px;
+  }
+
+  .hiw-step-desc {
+    font-size: 12px;
+    color: rgba(197,212,178,0.8);
+    line-height: 1.5;
+  }
+
+  .hiw-connector {
+    width: 1px;
+    height: 16px;
+    background: rgba(255,255,255,0.15);
+    margin-left: 19px;
+  }
+
+  .hiw-note {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 0.5px solid rgba(255,255,255,0.1);
+    font-size: 11px;
+    color: rgba(197,212,178,0.6);
+    line-height: 1.6;
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* ── INLINE SUBMIT ── */
+  .inline-submit {
+    margin-bottom: 24px;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 18px;
+    background: var(--pine);
+    color: var(--white);
+    border: none;
+    border-radius: 14px;
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 20px rgba(30,58,47,0.3);
+    transition: background 0.2s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .submit-btn:active { transform: scale(0.98); background: var(--pine-mid); }
+  .submit-btn:hover { background: var(--pine-mid); }
+
+  .submit-arrow {
+    font-size: 20px;
+    transition: transform 0.2s;
+  }
+
+  .submit-btn:hover .submit-arrow { transform: translateX(4px); }
+
+  .submit-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-light);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* ── RESULTS PREVIEW ── */
+  .results-section {
+    margin-top: 32px;
+  }
+
+  .results-heading {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--pine);
+    margin-bottom: 4px;
+  }
+
+  .results-sub {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-bottom: 18px;
+    font-style: italic;
+  }
+
+  .route-card {
+    background: var(--white);
+    border-radius: 16px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px var(--shadow);
+    border: 0.5px solid rgba(30,58,47,0.08);
+  }
+
+  .route-card.best-fit {
+    border: 1.5px solid var(--pine-light);
+  }
+
+  .route-banner {
+    background: var(--pine-light);
+    padding: 5px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--sage);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .route-top {
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .route-rank-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--parchment);
+    line-height: 1;
+    flex-shrink: 0;
+    width: 32px;
+    text-align: center;
+  }
+
+  .best-fit .route-rank-num { color: var(--sage); }
+
+  .route-info { flex: 1; }
+
+  .route-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pine);
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+
+  .route-desc {
+    font-size: 13px;
+    color: var(--text-mid);
+    line-height: 1.5;
+    font-style: italic;
+    margin-bottom: 12px;
+  }
+
+  .route-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .stat-pill {
+    background: var(--parchment);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-mid);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .stat-pill.good { background: #e8f4e0; color: #2d5a1b; }
+  .stat-pill.warn { background: #fdf0e6; color: #8b4b10; }
+  .stat-pill.bad  { background: #fce8e8; color: #8b1f1f; }
+
+  .route-fit-bar {
+    padding: 0 16px 6px 60px;
+  }
+
+  .fit-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-light);
+    margin-bottom: 4px;
+  }
+
+  .fit-track {
+    height: 5px;
+    background: var(--parchment);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .fit-fill {
+    height: 100%;
+    background: var(--pine-light);
+    border-radius: 3px;
+  }
+
+  .route-segments {
+    border-top: 0.5px solid var(--parchment);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .seg-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .seg-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lichen);
+    flex-shrink: 0;
+  }
+
+  .seg-dot.camp { background: var(--bark); }
+  .seg-dot.water { background: var(--sky); }
+
+  .seg-name { flex: 1; color: var(--text-dark); font-weight: 500; }
+  .seg-stat { color: var(--text-light); font-size: 11px; }
+
+  .route-tradeoffs {
+    border-top: 0.5px solid var(--parchment);
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .tradeoff {
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    line-height: 1.4;
+  }
+
+  .tradeoff.pro { background: #edf5e8; color: #2a5515; border: 0.5px solid #bcd4a8; }
+  .tradeoff.con { background: #f9eee8; color: #7a3820; border: 0.5px solid #e2baa0; }
+
+  .route-actions {
+    border-top: 0.5px solid var(--parchment);
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .route-action-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--parchment);
+    background: var(--cream);
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .route-action-btn.primary {
+    background: var(--pine);
+    color: var(--white);
+    border-color: transparent;
+  }
+
+  /* ── SECTION DIVIDER ── */
+  .form-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 16px;
+    opacity: 0.5;
+  }
+
+  .form-divider::before,
+  .form-divider::after {
+    content: '';
+    flex: 1;
+    height: 0.5px;
+    background: var(--stone);
+  }
+
+  .form-divider span {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--stone);
+    font-weight: 600;
+  }
+
+  /* ── IMPORTANCE BADGES ── */
+  .importance-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .imp-badge {
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid var(--parchment);
+    color: var(--text-light);
+    background: var(--cream);
+    user-select: none;
+  }
+
+  .imp-badge.active-low  { background: #f0f5ea; color: #3d6b1e; border-color: #bbd49c; }
+  .imp-badge.active-med  { background: #fff4e0; color: #8b5a00; border-color: #f0c86a; }
+  .imp-badge.active-high { background: #fde8e8; color: #8b1f1f; border-color: #e8a0a0; }
+
+  /* ── MODE CARDS ── */
+  .mode-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .mode-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--parchment);
+    background: var(--cream);
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .mode-card:hover { border-color: var(--lichen); }
+
+  .mode-card.active {
+    border-color: var(--pine-light);
+    background: #edf4ef;
+  }
+
+  .mode-card-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+
+  .mode-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 2px;
+  }
+
+  .mode-card.active .mode-card-title { color: var(--pine); }
+
+  .mode-card-sub {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.4;
+  }
+
+  .mode-panel { display: flex; flex-direction: column; gap: 18px; }
+
+  /* ── DATE ROW ── */
+  .date-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .date-block { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+
+  .date-label {
+    font-size: 11px;
+    color: var(--text-light);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .date-block input[type="date"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--parchment);
+    border-radius: 10px;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 14px;
+    color: var(--text-dark);
+    background: var(--cream);
+    outline: none;
+    -webkit-appearance: none;
+  }
+
+  .date-block input[type="date"]:focus {
+    border-color: var(--pine-light);
+    box-shadow: 0 0 0 3px rgba(61,107,84,0.1);
+  }
+
+  .date-sep {
+    font-size: 16px;
+    color: var(--text-light);
+    flex-shrink: 0;
+    margin-top: 18px;
+  }
+
+  /* ── EXPORT SHEET ── */
+  .export-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20,35,25,0.55);
+    z-index: 1000;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .export-overlay.open { display: flex; }
+
+  .export-sheet {
+    background: var(--white);
+    border-radius: 22px 22px 0 0;
+    width: 100%;
+    max-width: 540px;
+    padding: 0 0 32px;
+    max-height: 92vh;
+    overflow-y: auto;
+    animation: slideSheet 0.28s cubic-bezier(0.32,0.72,0,1) both;
+  }
+
+  @keyframes slideSheet {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  .export-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--parchment);
+    border-radius: 2px;
+    margin: 12px auto 0;
+  }
+
+  .export-route-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--pine);
+    padding: 14px 20px 2px;
+  }
+
+  .export-subtitle {
+    font-size: 13px;
+    color: var(--text-light);
+    padding: 0 20px 12px;
+  }
+
+  .export-apps { padding: 0 12px; }
+
+  .export-app-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .export-app-row:hover, .export-app-row:active { background: var(--cream); }
+
+  .app-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Source Sans 3', sans-serif;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+    color: #fff;
+  }
+
+  .app-icon-gpx    { background: #3D6B54; }
+  .app-icon-gaia   { background: #1A6B3A; font-size: 20px; font-weight: 800; }
+  .app-icon-onx    { background: #F06400; font-size: 10px; }
+  .app-icon-caltopo{ background: #2255A4; }
+  .app-icon-alltrails { background: #1F6F3E; }
+  .app-icon-garmin { background: #007CC3; font-size: 9px; }
+  .app-icon-kml    { background: #E4680A; }
+
+  .app-info { flex: 1; }
+
+  .app-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 1px;
+  }
+
+  .app-desc {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.3;
+  }
+
+  .app-arrow {
+    font-size: 16px;
+    color: var(--text-light);
+    flex-shrink: 0;
+  }
+
+  .export-divider {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-light);
+    padding: 8px 20px 4px;
+  }
+
+  .export-qr-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: background 0.12s;
+    -webkit-tap-highlight-color: transparent;
+    border-radius: 12px;
+    margin: 0 12px;
+  }
+
+  .export-qr-row:hover { background: var(--cream); }
+
+  .qr-thumb {
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    border: 1.5px solid var(--parchment);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    background: var(--white);
+  }
+
+  .qr-placeholder-mini {
+    width: 34px;
+    height: 34px;
+    background:
+      repeating-linear-gradient(0deg, var(--pine) 0px, var(--pine) 3px, transparent 3px, transparent 6px),
+      repeating-linear-gradient(90deg, var(--pine) 0px, var(--pine) 3px, transparent 3px, transparent 6px);
+    opacity: 0.25;
+  }
+
+  .export-coords-row {
+    margin: 8px 20px 0;
+    background: var(--cream);
+    border-radius: 12px;
+    padding: 12px 14px;
+    border: 0.5px solid var(--parchment);
+  }
+
+  .export-coords-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-light);
+    margin-bottom: 8px;
+  }
+
+  .export-coords-box {
+    font-family: 'Source Sans 3', monospace;
+    font-size: 11.5px;
+    color: var(--text-mid);
+    line-height: 1.7;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .copy-btn {
+    margin-top: 10px;
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: var(--pine);
+    color: var(--white);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+
+  .copy-btn:active { background: var(--pine-mid); }
+  .copy-btn.copied { background: var(--moss); }
+
+  .export-close {
+    margin: 16px 20px 0;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-light);
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 12px;
+    transition: background 0.12s;
+  }
+
+  .export-close:hover { background: var(--cream); }
+
+  /* ── QR MODAL ── */
+  .qr-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20,35,25,0.7);
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .qr-overlay.open { display: flex; }
+
+  .qr-modal {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    animation: popIn 0.22s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .qr-modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--pine);
+    margin-bottom: 6px;
+  }
+
+  .qr-modal-sub {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .qr-code-wrap {
+    background: var(--white);
+    border: 1.5px solid var(--parchment);
+    border-radius: 14px;
+    padding: 16px;
+    display: inline-block;
+    margin-bottom: 16px;
+  }
+
+  #qr-canvas { display: block; }
+
+  .qr-app-hints {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .qr-hint {
+    font-size: 11px;
+    color: var(--text-light);
+    background: var(--cream);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 0.5px solid var(--parchment);
+  }
+
+  /* ── EMAIL GATE ── */
+  .email-gate-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(20,35,25,0.6);
+    z-index: 500;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .email-gate-overlay.open { display: flex; }
+  .email-gate-sheet {
+    background: var(--white);
+    border-radius: 22px 22px 0 0;
+    width: 100%;
+    max-width: 540px;
+    padding: 28px 24px 40px;
+    animation: slideSheet 0.28s cubic-bezier(0.32,0.72,0,1) both;
+  }
+  .gate-handle { width: 40px; height: 4px; background: var(--parchment); border-radius: 2px; margin: 0 auto 20px; }
+  .gate-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--pine); margin-bottom: 6px; }
+  .gate-sub { font-size: 14px; color: var(--text-light); line-height: 1.5; margin-bottom: 20px; }
+  .gate-input-row { display: flex; gap: 8px; }
+  .gate-input-row input[type="email"] {
+    flex: 1; padding: 12px 16px; border: 1.5px solid var(--parchment); border-radius: 12px;
+    font-family: 'Source Sans 3', sans-serif; font-size: 15px; color: var(--text-dark);
+    background: var(--cream); outline: none; transition: border-color 0.2s;
+  }
+  .gate-input-row input:focus { border-color: var(--pine-light); }
+  .gate-go-btn {
+    padding: 12px 20px; background: var(--pine); color: var(--white); border: none;
+    border-radius: 12px; font-family: 'Playfair Display', serif; font-size: 16px;
+    font-weight: 700; cursor: pointer; white-space: nowrap; transition: background 0.15s;
+  }
+  .gate-go-btn:active { background: var(--pine-mid); }
+  .gate-skip { text-align: center; margin-top: 14px; font-size: 12px; color: var(--text-light); cursor: pointer; text-decoration: underline; }
+
+  /* ── LOADING STATE ── */
+  .loading-screen {
+    display: none;
+    padding: 60px 24px;
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .loading-screen.show { display: block; }
+  .loading-pine {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    animation: sway 2s ease-in-out infinite;
+    display: block;
+    margin-bottom: 20px;
+  }
+  @keyframes sway {
+    0%, 100% { transform: rotate(-4deg); }
+    50% { transform: rotate(4deg); }
+  }
+  .loading-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--pine);
+    margin-bottom: 8px;
+  }
+  .loading-msg {
+    font-size: 14px;
+    color: var(--text-light);
+    font-style: italic;
+    min-height: 22px;
+    transition: opacity 0.3s;
+  }
+  .loading-bar-wrap {
+    margin: 24px auto 0;
+    max-width: 260px;
+    height: 4px;
+    background: var(--parchment);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .loading-bar {
+    height: 100%;
+    background: var(--pine-light);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  /* ── ERROR STATE ── */
+  .error-card {
+    background: #fce8e8;
+    border: 1px solid #e8a0a0;
+    border-radius: 14px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: center;
+  }
+  .error-card p { font-size: 14px; color: #7a1f1f; margin-bottom: 14px; }
+  .retry-btn {
+    padding: 10px 24px; background: var(--pine); color: var(--white);
+    border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: 'Source Sans 3', sans-serif;
+  }
+
+  /* ── GEAR TIP ── */
+  .gear-tip {
+    background: var(--parchment);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.5;
+    border-left: 3px solid var(--bark);
+    margin-top: 8px;
+  }
+  .gear-tip strong { color: var(--bark); }
+
+  /* ── BACK BUTTON ── */
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-light);
+    cursor: pointer;
+    margin-bottom: 16px;
+    padding: 6px 0;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+  .back-btn:hover { color: var(--pine); }
+
+  /* ── AFFILIATE ROW ── */
+  .affiliate-row {
+    border-top: 0.5px solid var(--parchment);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f7f4ec;
+  }
+  .aff-text { flex: 1; font-size: 12px; color: var(--text-mid); line-height: 1.4; }
+  .aff-text strong { color: var(--pine); }
+  .aff-btn {
+    padding: 6px 12px; border-radius: 8px; background: var(--pine-light);
+    color: var(--white); font-size: 12px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; border: none; font-family: 'Source Sans 3', sans-serif;
+    text-decoration: none; display: inline-block;
+  }
+
+  /* ── MOBILE RESPONSIVENESS ── */
+  @media (max-width: 400px) {
+    .concern-grid { grid-template-columns: 1fr; }
+    .route-tradeoffs { grid-template-columns: 1fr; }
+    .toggle-opt { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">AI-powered trail planning</div>
+  <div class="hero-logo">Pack<span>Path</span></div>
+  <div class="hero-tagline">Routes that actually fit your trip</div>
+  <div class="hero-pain-points">
+    <div class="pain-point">
+      <span class="pain-icon">😤</span>
+      <span>Tired of routes that look great online but destroy your knees on day 2?</span>
+    </div>
+    <div class="pain-point">
+      <span class="pain-icon">💧</span>
+      <span>Ran dry 4 miles from camp because the "reliable stream" was seasonal?</span>
+    </div>
+    <div class="pain-point">
+      <span class="pain-icon">🚗</span>
+      <span>Point-to-point shuttle logistics eating your weekend before you even start?</span>
+    </div>
+  </div>
+</div>
+
+<!-- STICKY PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-steps">
+    <div class="step-tab active">Location</div>
+    <div class="step-tab">Dates</div>
+    <div class="step-tab">Terrain</div>
+    <div class="step-tab">Water</div>
+    <div class="step-tab">Priorities</div>
+  </div>
+</div>
+
+<!-- FORM -->
+<div class="form-container">
+<!-- HOW IT WORKS -->
+  <div class="how-it-works" id="how-it-works">
+    <div class="hiw-title">How PackPath works</div>
+    <div class="hiw-steps">
+      <div class="hiw-step">
+        <div class="hiw-step-icon">📋</div>
+        <div class="hiw-step-text">
+          <div class="hiw-step-title">Fill out your preferences</div>
+          <div class="hiw-step-desc">Tell us where, when, how far, how hard, and what matters most — water, solitude, scenery, permits.</div>
+        </div>
+      </div>
+      <div class="hiw-connector"></div>
+      <div class="hiw-step">
+        <div class="hiw-step-icon">🤖</div>
+        <div class="hiw-step-text">
+          <div class="hiw-step-title">AI builds your routes</div>
+          <div class="hiw-step-desc">PackPath stitches together real named trail segments into 3 candidate itineraries, ranked by how well they match your preferences.</div>
+        </div>
+      </div>
+      <div class="hiw-connector"></div>
+      <div class="hiw-step">
+        <div class="hiw-step-icon">🗺️</div>
+        <div class="hiw-step-text">
+          <div class="hiw-step-title">Export to your mapping app</div>
+          <div class="hiw-step-desc">One tap sends your chosen route to Gaia GPS, onX, CalTopo, AllTrails, or Garmin. GPX and KML download included.</div>
+        </div>
+      </div>
+    </div>
+    <div class="hiw-note">PackPath uses AI trained on trail data, wilderness regulations, and backpacking conditions across North America. Routes are suggestions — always verify current conditions before heading out.</div>
+  </div>
+
+  
+  <!-- SECTION 1: WHERE & WHEN -->
+  <div class="form-section" style="animation-delay:0.05s">
+    <div class="section-header">
+      <div class="section-icon">🗺️</div>
+      <div>
+        <div class="section-title">Where &amp; when</div>
+        <div class="section-subtitle">Have a place in mind, or let us find you something great</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <div class="field">
+        <label class="field-label">Do you have a destination in mind?</label>
+        <div class="mode-cards" id="location-mode">
+          <div class="mode-card active" data-mode="explore">
+            <div class="mode-card-icon">🧭</div>
+            <div class="mode-card-text">
+              <div class="mode-card-title">Surprise me — find something great</div>
+              <div class="mode-card-sub">I'm open. Show me the best options that match my preferences.</div>
+            </div>
+          </div>
+          <div class="mode-card" data-mode="region">
+            <div class="mode-card-icon">🏔️</div>
+            <div class="mode-card-text">
+              <div class="mode-card-title">I have a general area in mind</div>
+              <div class="mode-card-sub">Sierra Nevada, Cascades, Colorado Rockies, Wind Rivers, etc.</div>
+            </div>
+          </div>
+          <div class="mode-card" data-mode="specific">
+            <div class="mode-card-icon">📍</div>
+            <div class="mode-card-text">
+              <div class="mode-card-title">I know exactly where I want to go</div>
+              <div class="mode-card-sub">Specific park, wilderness area, or trailhead already in mind.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXPLORE MODE -->
+      <div id="mode-explore" class="mode-panel">
+        <div class="field">
+          <label class="field-label">Which regions can you get to? <span class="field-hint">select all that work</span></label>
+          <div class="chips" id="region-chips">
+            <div class="chip active">West Coast / Sierra</div>
+            <div class="chip">Pacific Northwest</div>
+            <div class="chip">Colorado / Rockies</div>
+            <div class="chip">Desert Southwest</div>
+            <div class="chip">Appalachians / East</div>
+            <div class="chip">Alaska / remote PNW</div>
+            <div class="chip">Anywhere — I'll fly</div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">How far are you willing to drive to the trailhead?</label>
+          <div class="toggle-row" id="drive-time">
+            <div class="toggle-opt" data-val="2">2 hrs</div>
+            <div class="toggle-opt active" data-val="4">4 hrs</div>
+            <div class="toggle-opt" data-val="8">8 hrs</div>
+            <div class="toggle-opt" data-val="any">No limit</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REGION MODE -->
+      <div id="mode-region" class="mode-panel" style="display:none">
+        <div class="field">
+          <label class="field-label">Which region or mountain range?</label>
+          <input type="text" id="region-input" placeholder="e.g. Sierra Nevada, Wind Rivers, Cascades, Smokies…" />
+        </div>
+        <div class="field">
+          <label class="field-label">Any sub-area preference? <span class="field-hint">optional</span></label>
+          <input type="text" placeholder="e.g. Northern Sierra, Front Range, Southern Cascades" />
+        </div>
+        <div class="field">
+          <label class="field-label">Do you need to stay near a specific city?</label>
+          <div class="toggle-row" id="start-flex">
+            <div class="toggle-opt active" data-val="any">Any trailhead in region</div>
+            <div class="toggle-opt" data-val="close">Yes — near a specific city</div>
+          </div>
+        </div>
+        <div id="city-field" style="display:none" class="field">
+          <label class="field-label">Closest city or airport</label>
+          <input type="text" placeholder="e.g. Denver, CO or SEA airport" />
+        </div>
+      </div>
+
+      <!-- SPECIFIC MODE -->
+      <div id="mode-specific" class="mode-panel" style="display:none">
+        <div class="field">
+          <label class="field-label">Trailhead, park, or wilderness area</label>
+          <input type="text" placeholder="e.g. Agnew Meadows, Ansel Adams Wilderness, RMNP Bear Lake" />
+        </div>
+        <div class="field">
+          <label class="field-label">How firm is this?</label>
+          <div class="chips" id="lock-chips">
+            <div class="chip active">Must start here</div>
+            <div class="chip">Prefer this, open to nearby alternatives</div>
+            <div class="chip">Just a starting idea — open to better options</div>
+          </div>
+        </div>
+        <div class="callout" style="border-left-color: var(--bark);">
+          <strong>Good to know:</strong> Being open to nearby trailheads often unlocks significantly better loop options and less crowded routes.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 2: TRIP DATES & LENGTH -->
+  <div class="form-section" style="animation-delay:0.08s">
+    <div class="section-header">
+      <div class="section-icon">📅</div>
+      <div>
+        <div class="section-title">When &amp; how long</div>
+        <div class="section-subtitle">Dates affect permits, snow conditions, and daylight</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <div class="field">
+        <label class="field-label">When are you going?</label>
+        <div class="date-row">
+          <div class="date-block">
+            <div class="date-label">Start date</div>
+            <input type="date" id="date-start" />
+          </div>
+          <div class="date-sep">→</div>
+          <div class="date-block">
+            <div class="date-label">Return date</div>
+            <input type="date" id="date-end" />
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">How flexible are your dates?</label>
+        <div class="toggle-row" id="date-flex">
+          <div class="toggle-opt" data-val="fixed">Fixed</div>
+          <div class="toggle-opt active" data-val="flex-week">± 1 week</div>
+          <div class="toggle-opt" data-val="flex-month">Any time this season</div>
+        </div>
+        <div class="callout">
+          <strong>Flexibility helps.</strong> Being open by even a few days dramatically improves permit availability and lets us route around shoulder-season snow.
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">How many days are you hiking? <span class="field-hint">not counting drive days</span></label>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" min="1" max="14" value="4" step="1"
+              id="days-slider" oninput="document.getElementById('days-val').textContent=this.value+(this.value==1?' day':' days');updateDiff(this.value)" />
+            <div class="slider-labels"><span>1 day</span><span>1 week</span><span>2 weeks</span></div>
+          </div>
+          <div class="slider-val" id="days-val">4 days</div>
+        </div>
+        <div class="diff-meter" id="diff-meter">
+          <div class="diff-seg lit"></div><div class="diff-seg lit"></div>
+          <div class="diff-seg"></div><div class="diff-seg"></div><div class="diff-seg"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">How many miles per day feels right? <span class="field-hint">your comfortable pace, not your max</span></label>
+        <div class="slider-wrap">
+          <div class="slider-track">
+            <input type="range" min="3" max="22" value="9" step="1"
+              id="miles-slider" oninput="document.getElementById('miles-val').textContent=this.value+' mi/day'" />
+            <div class="slider-labels"><span>3 mi</span><span>12 mi</span><span>22 mi</span></div>
+          </div>
+          <div class="slider-val" id="miles-val">9 mi/day</div>
+        </div>
+        <div class="callout">
+          <strong>Be honest here.</strong> Most hikers overestimate by 30% — factor in elevation, photo stops, and those long lunch breaks. A comfortable 9 mi/day beats a miserable 14.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 3: ROUTE SHAPE -->
+  <div class="form-section" style="animation-delay:0.1s">
+    <div class="section-header">
+      <div class="section-icon">🔁</div>
+      <div>
+        <div class="section-title">Route shape</div>
+        <div class="section-subtitle">This affects logistics as much as scenery</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label class="field-label">What kind of route do you want?</label>
+        <div class="toggle-row" id="route-type">
+          <div class="toggle-opt active" data-val="loop">Loop</div>
+          <div class="toggle-opt" data-val="p2p">Point-to-point</div>
+          <div class="toggle-opt" data-val="lollipop">Lollipop</div>
+          <div class="toggle-opt" data-val="out-back">Out &amp; back</div>
+        </div>
+        <div class="callout" id="route-callout">
+          <strong>Loop:</strong> Start and finish at the same trailhead. No shuttle needed. Best for solo trips, spontaneous starts, and minimizing car logistics.
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">How open are you to other route shapes?</label>
+        <div class="chips" id="flex-chips">
+          <div class="chip active">Prefer this, but open to suggestions</div>
+          <div class="chip">Only this type — filter strictly</div>
+          <div class="chip">Whatever scores best overall</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: TERRAIN & SCENERY -->
+  <div class="form-section" style="animation-delay:0.15s">
+    <div class="section-header">
+      <div class="section-icon">⛰️</div>
+      <div>
+        <div class="section-title">Terrain &amp; scenery</div>
+        <div class="section-subtitle">What you want to see — and what you want to avoid</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label class="field-label">How much climbing can you handle per day?</label>
+        <div class="toggle-row" id="elev-tol">
+          <div class="toggle-opt" data-val="gentle">Gentle<br><span style="font-size:10px;font-weight:400;opacity:0.7">&lt;1,000 ft</span></div>
+          <div class="toggle-opt active" data-val="moderate">Moderate<br><span style="font-size:10px;font-weight:400;opacity:0.7">1–2,500 ft</span></div>
+          <div class="toggle-opt" data-val="strenuous">Strenuous<br><span style="font-size:10px;font-weight:400;opacity:0.7">2,500–4k ft</span></div>
+          <div class="toggle-opt" data-val="brutal">Bring it<br><span style="font-size:10px;font-weight:400;opacity:0.7">4,000+ ft</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">What scenery are you after? <span class="field-hint">pick everything that excites you</span></label>
+        <div class="chips" id="scenery">
+          <div class="chip scenery active">Alpine</div>
+          <div class="chip scenery active">Mountain lakes</div>
+          <div class="chip scenery">Dense forest</div>
+          <div class="chip scenery">Desert / slickrock</div>
+          <div class="chip scenery">Canyon</div>
+          <div class="chip scenery">Ridgeline views</div>
+          <div class="chip scenery">Meadows</div>
+          <div class="chip scenery">Coastal</div>
+          <div class="chip scenery">Waterfalls</div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Anything you want to avoid? <span class="field-hint">optional — leave blank if no restrictions</span></label>
+        <div class="chips" id="avoid">
+          <div class="chip">Scrambling / class 3+</div>
+          <div class="chip">Deep creek crossings</div>
+          <div class="chip">Exposed ridges</div>
+          <div class="chip">Snowfields</div>
+          <div class="chip">Scree / talus fields</div>
+          <div class="chip">Long road walks</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: WATER & CAMPING -->
+  <div class="form-section" style="animation-delay:0.2s">
+    <div class="section-header">
+      <div class="section-icon">💧</div>
+      <div>
+        <div class="section-title">Water &amp; camping</div>
+        <div class="section-subtitle">The details that actually keep you safe and comfortable</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <div class="field">
+        <label class="field-label">What's the longest dry stretch you're comfortable carrying water for?</label>
+        <div class="toggle-row" id="dry-stretch">
+          <div class="toggle-opt" data-val="3">3 mi<br><span style="font-size:10px;font-weight:400;opacity:0.7">~2 hrs</span></div>
+          <div class="toggle-opt active" data-val="6">6 mi<br><span style="font-size:10px;font-weight:400;opacity:0.7">~3 hrs</span></div>
+          <div class="toggle-opt" data-val="10">10 mi<br><span style="font-size:10px;font-weight:400;opacity:0.7">~5 hrs</span></div>
+          <div class="toggle-opt" data-val="any">No limit</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">What water sources are you OK with?</label>
+        <div class="check-list" id="water-pref-list">
+          <div class="check-item checked">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Perennial streams &amp; lakes</div>
+              <div class="check-sub">Year-round, most reliable</div>
+            </div>
+          </div>
+          <div class="check-item checked">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Seasonal streams (noted in route)</div>
+              <div class="check-sub">Reliable spring–early summer, may be dry by August</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Snowmelt</div>
+              <div class="check-sub">Plentiful early season, requires filtering</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Desert tanks / tinajas</div>
+              <div class="check-sub">For desert routes — natural rock catchments</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Camp setup preference</label>
+        <div class="check-list" id="camp-style">
+          <div class="check-item checked">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Dispersed / Leave No Trace</div>
+              <div class="check-sub">Set up anywhere legal — maximum flexibility</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Established sites only</div>
+              <div class="check-sub">Fire rings, flat pads — better for groups and bear country</div>
+            </div>
+          </div>
+          <div class="check-item checked">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Lakeside or water-view camps are a priority</div>
+              <div class="check-sub">Worth adding a mile or two to get there</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Bear box or hang point required at every site</div>
+              <div class="check-sub">Required in Sierra, Cascades, and most NPs</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Permit situation</label>
+        <div class="toggle-row" id="permit">
+          <div class="toggle-opt active" data-val="avoid">Avoid permit areas</div>
+          <div class="toggle-opt" data-val="planhead">Fine — I'll plan ahead</div>
+          <div class="toggle-opt" data-val="walkup">Walk-up only</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SECTION 6: YOUR PACK & FITNESS -->
+  <div class="form-section" style="animation-delay:0.25s">
+    <div class="section-header">
+      <div class="section-icon">🎒</div>
+      <div>
+        <div class="section-title">Your pack &amp; fitness</div>
+        <div class="section-subtitle">Honest answers here = routes that actually fit you</div>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label class="field-label">How experienced are you as a backpacker?</label>
+        <div class="toggle-row" id="exp-level">
+          <div class="toggle-opt" data-val="new">New<br><span style="font-size:10px;font-weight:400;opacity:0.7">&lt;5 trips</span></div>
+          <div class="toggle-opt active" data-val="intermediate">Intermediate<br><span style="font-size:10px;font-weight:400;opacity:0.7">5–20 trips</span></div>
+          <div class="toggle-opt" data-val="experienced">Experienced<br><span style="font-size:10px;font-weight:400;opacity:0.7">20+ trips</span></div>
+          <div class="toggle-opt" data-val="expert">Expert<br><span style="font-size:10px;font-weight:400;opacity:0.7">Thru-hiker</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Roughly how much will your pack weigh?</label>
+        <div class="toggle-row" id="pack-weight">
+          <div class="toggle-opt" data-val="ul">Ultralight<br><span style="font-size:10px;font-weight:400;opacity:0.7">&lt;10 lb</span></div>
+          <div class="toggle-opt active" data-val="light">Light<br><span style="font-size:10px;font-weight:400;opacity:0.7">10–18 lb</span></div>
+          <div class="toggle-opt" data-val="standard">Standard<br><span style="font-size:10px;font-weight:400;opacity:0.7">18–30 lb</span></div>
+          <div class="toggle-opt" data-val="heavy">Heavy<br><span style="font-size:10px;font-weight:400;opacity:0.7">30+ lb</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Who's coming?</label>
+        <div class="chips" id="group">
+          <div class="chip active">Solo</div>
+          <div class="chip">Couple / pair</div>
+          <div class="chip">Small group (3–5)</div>
+          <div class="chip">Large group (6+)</div>
+          <div class="chip">Kids in tow</div>
+          <div class="chip">Dog coming</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 7: WHAT MATTERS MOST -->
+  <div class="form-section" style="animation-delay:0.3s">
+    <div class="section-header">
+      <div class="section-icon">⭐</div>
+      <div>
+        <div class="section-title">What matters most to you</div>
+        <div class="section-subtitle">Help us rank your routes the way you actually think</div>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <div class="field">
+        <label class="field-label">What are you hoping to get out of this trip? <span class="field-hint">pick your top priorities</span></label>
+        <div class="check-list" id="priorities-list">
+          <div class="check-item checked">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Solitude — few or no other people</div>
+            </div>
+          </div>
+          <div class="check-item checked">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Dramatic scenery &amp; photography</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">A summit — I want a peak to stand on</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Swimming — lakes or rivers to jump in</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Fishing access</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Well-marked, easy-to-follow trails</div>
+            </div>
+          </div>
+          <div class="check-item">
+            <div class="custom-check"></div>
+            <div>
+              <div class="check-text">Physical challenge — I want to feel it</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Any concerns about this trip? <span class="field-hint">we'll avoid or flag these</span></label>
+        <div class="concern-grid">
+          <div class="concern-chip">
+            <span class="concern-chip-icon">🦅</span>
+            <div class="concern-chip-text">Exposed scrambling</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">🌊</span>
+            <div class="concern-chip-text">Deep water crossings</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">🐻</span>
+            <div class="concern-chip-text">Heavy bear activity</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">📵</span>
+            <div class="concern-chip-text">No cell signal</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">🌩️</span>
+            <div class="concern-chip-text">Lightning exposure</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">👥</span>
+            <div class="concern-chip-text">Crowded trails</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">🏥</span>
+            <div class="concern-chip-text">Far from help if emergency</div>
+          </div>
+          <div class="concern-chip">
+            <span class="concern-chip-icon">❄️</span>
+            <div class="concern-chip-text">Late-season snow</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Anything else we should know?</label>
+        <textarea placeholder="e.g. Need to be back by noon Sunday. One person has bad knees. Fly fishing access is important."></textarea>
+      </div>
+
+    </div>
+  </div>
+
+    <!-- INLINE SUBMIT BUTTON -->
+  <div class="inline-submit">
+    <button class="submit-btn" id="find-routes-btn">
+      Find my routes <span class="submit-arrow">→</span>
+    </button>
+    <div class="submit-note">AI matches trail segments to your exact preferences · Usually takes 10–15 seconds</div>
+  </div>
+
+  <!-- DYNAMIC RESULTS RENDERED BY JS -->
+  <div id="results-container"></div>
+
+</div>
+<!-- END FORM CONTAINER -->
+
+<!-- EMAIL GATE -->
+<div id="email-gate" class="email-gate-overlay">
+  <div class="email-gate-sheet">
+    <div class="gate-handle"></div>
+    <div class="gate-title">Almost there</div>
+    <div class="gate-sub">Drop your email and we'll send you route updates, permit alerts, and the occasional trail intel. No spam — we're backpackers too.</div>
+    <div class="gate-input-row">
+      <input type="email" id="gate-email" placeholder="you@example.com" />
+      <button class="gate-go-btn" id="gate-submit">Find routes →</button>
+    </div>
+    <div class="gate-skip" id="gate-skip">Skip for now</div>
+  </div>
+</div>
+
+<!-- LOADING SCREEN -->
+<div class="loading-screen" id="loading-screen">
+  <span class="loading-pine">🌲</span>
+  <div class="loading-title">Scouting your routes</div>
+  <div class="loading-msg" id="loading-msg">Checking trail conditions...</div>
+  <div class="loading-bar-wrap">
+    <div class="loading-bar" id="loading-bar"></div>
+  </div>
+</div>
+
+<!-- EXPORT SHEET MODAL -->
+<div id="export-overlay" class="export-overlay" onclick="closeExport(event)">
+  <div class="export-sheet" id="export-sheet">
+    <div class="export-handle"></div>
+    <div class="export-route-name" id="export-route-name">Thousand Island Lake Loop</div>
+    <div class="export-subtitle">Choose how to open this route</div>
+
+    <div class="export-apps">
+
+      <div class="export-app-row" onclick="exportTo('gpx-download')">
+        <div class="app-icon app-icon-gpx">GPX</div>
+        <div class="app-info">
+          <div class="app-name">Download GPX file</div>
+          <div class="app-desc">Universal format — works with any mapping app</div>
+        </div>
+        <div class="app-arrow">↓</div>
+      </div>
+
+      <div class="export-divider">Open directly in</div>
+
+      <div class="export-app-row" onclick="exportTo('gaia')">
+        <div class="app-icon app-icon-gaia">G</div>
+        <div class="app-info">
+          <div class="app-name">Gaia GPS</div>
+          <div class="app-desc">Opens in app · offline topo maps</div>
+        </div>
+        <div class="app-arrow">→</div>
+      </div>
+
+      <div class="export-app-row" onclick="exportTo('onx')">
+        <div class="app-icon app-icon-onx">onX</div>
+        <div class="app-info">
+          <div class="app-name">onX Backcountry</div>
+          <div class="app-desc">Opens import screen · land ownership overlay</div>
+        </div>
+        <div class="app-arrow">→</div>
+      </div>
+
+      <div class="export-app-row" onclick="exportTo('caltopo')">
+        <div class="app-icon app-icon-caltopo">CT</div>
+        <div class="app-info">
+          <div class="app-name">CalTopo</div>
+          <div class="app-desc">Opens in browser · best for route editing</div>
+        </div>
+        <div class="app-arrow">→</div>
+      </div>
+
+      <div class="export-app-row" onclick="exportTo('alltrails')">
+        <div class="app-icon app-icon-alltrails">AT</div>
+        <div class="app-info">
+          <div class="app-name">AllTrails</div>
+          <div class="app-desc">Import as custom route · Pro required</div>
+        </div>
+        <div class="app-arrow">→</div>
+      </div>
+
+      <div class="export-app-row" onclick="exportTo('garmin')">
+        <div class="app-icon app-icon-garmin">GAR</div>
+        <div class="app-info">
+          <div class="app-name">Garmin Explore</div>
+          <div class="app-desc">Sync to inReach or GPS device</div>
+        </div>
+        <div class="app-arrow">→</div>
+      </div>
+
+      <div class="export-app-row" onclick="exportTo('kml')">
+        <div class="app-icon app-icon-kml">KML</div>
+        <div class="app-info">
+          <div class="app-name">Download KML</div>
+          <div class="app-desc">Google Earth / Google Maps compatible</div>
+        </div>
+        <div class="app-arrow">↓</div>
+      </div>
+
+    </div>
+
+    <div class="export-divider">Planning on desktop?</div>
+
+    <div class="export-qr-row" onclick="openQR()">
+      <div class="qr-thumb" id="qr-thumb-mini">
+        <div class="qr-placeholder-mini"></div>
+      </div>
+      <div class="app-info">
+        <div class="app-name">Scan QR → open on phone</div>
+        <div class="app-desc">Tap to show full QR code — scan to download GPX directly to your phone and open in any app</div>
+      </div>
+      <div class="app-arrow">⊞</div>
+    </div>
+
+    <div class="export-coords-row">
+      <div class="export-coords-label">Or copy waypoints as coordinates</div>
+      <div class="export-coords-box" id="export-coords">
+37.6851, -119.0731 — Agnew Meadows TH
+37.6612, -119.0445 — Shadow Lake Camp
+37.6834, -119.1102 — Thousand Island Lake
+37.6523, -119.0867 — Rosalie Lake
+37.6851, -119.0731 — Agnew Meadows TH</div>
+      <div class="copy-btn" id="copy-btn" onclick="copyCoords()">Copy coordinates</div>
+    </div>
+
+    <div class="export-close" onclick="closeExportBtn()">Cancel</div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div id="qr-overlay" class="qr-overlay" onclick="closeQR(event)">
+  <div class="qr-modal">
+    <div class="qr-modal-title" id="qr-modal-title">Scan to open on your phone</div>
+    <div class="qr-modal-sub">Scan with your camera app — GPX downloads instantly and opens in Gaia, onX, or any mapping app</div>
+    <div class="qr-code-wrap">
+      <canvas id="qr-canvas" width="200" height="200"></canvas>
+    </div>
+    <div class="qr-app-hints">
+      <div class="qr-hint">iOS: Camera app → tap notification</div>
+      <div class="qr-hint">Android: Camera app or Google Lens</div>
+    </div>
+    <div class="export-close" onclick="closeQR()">Done</div>
+  </div>
+</div>
+
+
+
+<script>
+// ── PACKPATH — CLEAN WIRED JS ──
+
+// ── TOGGLE HELPERS ──
+
+document.querySelectorAll('#location-mode .mode-card').forEach(function(card) {
+  card.addEventListener('click', function() {
+    document.querySelectorAll('#location-mode .mode-card').forEach(function(c) { c.classList.remove('active'); });
+    card.classList.add('active');
+    var mode = card.dataset.mode;
+    document.getElementById('mode-explore').style.display  = mode === 'explore'  ? 'flex' : 'none';
+    document.getElementById('mode-region').style.display   = mode === 'region'   ? 'flex' : 'none';
+    document.getElementById('mode-specific').style.display = mode === 'specific' ? 'flex' : 'none';
+  });
+});
+
+var startFlex = document.getElementById('start-flex');
+if (startFlex) {
+  startFlex.querySelectorAll('.toggle-opt').forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      var cf = document.getElementById('city-field');
+      if (cf) cf.style.display = opt.dataset.val === 'close' ? 'flex' : 'none';
+    });
+  });
+}
+
+document.querySelectorAll('.toggle-row').forEach(function(row) {
+  row.querySelectorAll('.toggle-opt').forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      row.querySelectorAll('.toggle-opt').forEach(function(o) { o.classList.remove('active'); });
+      opt.classList.add('active');
+    });
+  });
+});
+
+['flex-chips','permit'].forEach(function(id) {
+  var g = document.getElementById(id);
+  if (!g) return;
+  g.querySelectorAll('.chip').forEach(function(c) {
+    c.addEventListener('click', function() {
+      g.querySelectorAll('.chip').forEach(function(x) { x.classList.remove('active'); });
+      c.classList.add('active');
+    });
+  });
+});
+
+['scenery','avoid','water-pref','group','region-chips'].forEach(function(id) {
+  var g = document.getElementById(id);
+  if (!g) return;
+  g.querySelectorAll('.chip').forEach(function(c) {
+    c.addEventListener('click', function() { c.classList.toggle('active'); });
+  });
+});
+
+var lockChips = document.getElementById('lock-chips');
+if (lockChips) {
+  lockChips.querySelectorAll('.chip').forEach(function(c) {
+    c.addEventListener('click', function() {
+      lockChips.querySelectorAll('.chip').forEach(function(x) { x.classList.remove('active'); });
+      c.classList.add('active');
+    });
+  });
+}
+
+document.querySelectorAll('.concern-chip').forEach(function(chip) {
+  chip.addEventListener('click', function() { chip.classList.toggle('active'); });
+});
+
+document.querySelectorAll('.check-item').forEach(function(item) {
+  item.addEventListener('click', function(e) { if(e.target.tagName !== 'A') item.classList.toggle('checked'); });
+});
+
+var callouts = {
+  'loop':     '<strong>Loop:</strong> Start and finish at the same trailhead. No shuttle needed.',
+  'p2p':      '<strong>Point-to-point:</strong> Start at one trailhead, end at another. Requires shuttle.',
+  'lollipop': '<strong>Lollipop:</strong> Out-and-back stem with a loop at the end. Best of both worlds.',
+  'out-back': '<strong>Out &amp; back:</strong> Go in, turn around. Simple logistics, great for peak-bagging.'
+};
+var rtGroup = document.getElementById('route-type');
+if (rtGroup) {
+  rtGroup.querySelectorAll('.toggle-opt').forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      var el = document.getElementById('route-callout');
+      if (el) el.innerHTML = callouts[opt.dataset.val] || '';
+    });
+  });
+}
+
+document.querySelectorAll('.step-tab').forEach(function(tab, i) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.step-tab').forEach(function(t) { t.classList.remove('active'); });
+    tab.classList.add('active');
+    var sections = document.querySelectorAll('.form-section');
+    var map = [0, 1, 3, 4, 6];
+    var target = sections[map[i] !== undefined ? map[i] : 0];
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+
+function toggleCheck(el) { el.classList.toggle('checked'); }
+
+function updateDiff(val) {
+  var segs = document.querySelectorAll('#diff-meter .diff-seg');
+  var lit  = Math.min(Math.round(val / 14 * 5), 5);
+  segs.forEach(function(s, i) { s.classList.toggle('lit', i < lit); });
+}
+
+// ── FORM DATA COLLECTION ──
+
+function getActiveVals(id) {
+  var g = document.getElementById(id);
+  if (!g) return '';
+  return Array.from(g.querySelectorAll('.toggle-opt.active, .chip.active'))
+    .map(function(el) { return el.dataset.val || el.textContent.trim(); }).join(', ');
+}
+
+function getCheckedTexts(selector) {
+  return Array.from(document.querySelectorAll(selector.startsWith('#') ? selector + ' .check-item.checked .check-text' : selector + ' .check-item.checked .check-text'))
+    .map(function(el) { return el.textContent.trim(); }).join('; ');
+}
+
+function collectPrefs() {
+  var activeMode = document.querySelector('#location-mode .mode-card.active');
+  var mode = activeMode ? activeMode.dataset.mode : 'explore';
+  var locationVal = '';
+  if (mode === 'explore') {
+    locationVal = getActiveVals('region-chips');
+  } else if (mode === 'region') {
+    var ri = document.getElementById('region-input');
+    locationVal = ri ? ri.value.trim() : '';
+  } else {
+    var si = document.querySelector('#mode-specific input[type="text"]');
+    locationVal = si ? si.value.trim() : '';
+  }
+  var gainInputs = document.querySelectorAll('.range-display input[type="number"]');
+  var ta = document.querySelector('textarea');
+  return {
+    locationMode: mode,
+    location: locationVal || 'Sierra Nevada, CA',
+    regions: getActiveVals('region-chips'),
+    driveTime: getActiveVals('drive-time'),
+    dateStart: document.getElementById('date-start') ? document.getElementById('date-start').value : '',
+    dateEnd:   document.getElementById('date-end')   ? document.getElementById('date-end').value   : '',
+    dateFlex:  getActiveVals('date-flex'),
+    days:      document.getElementById('days-slider')  ? document.getElementById('days-slider').value  : '4',
+    milesPerDay: document.getElementById('miles-slider') ? document.getElementById('miles-slider').value : '9',
+    routeType:    getActiveVals('route-type'),
+    elevTolerance: getActiveVals('elev-tol'),
+    gainMin:  gainInputs[0] ? gainInputs[0].value : '1500',
+    gainMax:  gainInputs[1] ? gainInputs[1].value : '4000',
+    scenery:  getActiveVals('scenery'),
+    avoid:    getActiveVals('avoid'),
+    dryStretch:  getActiveVals('dry-stretch'),
+    waterPref:   getCheckedTexts('#water-pref-list'),
+    campStyle:   getCheckedTexts('.section-body'),
+    permitPref:  getActiveVals('permit') || getActiveVals('permit-row'),
+    expLevel:    getActiveVals('exp-level'),
+    packWeight:  getActiveVals('pack-weight'),
+    groupType:   getActiveVals('group'),
+    fears: Array.from(document.querySelectorAll('.concern-chip.active .concern-chip-text'))
+                .map(function(el) { return el.textContent.trim(); }).join(', '),
+    notes: ta ? ta.value.trim() : ''
+  };
+}
+
+// ── EMAIL GATE ──
+
+var pendingPrefs = null;
+
+var findBtn = document.getElementById('find-routes-btn');
+if (findBtn) {
+  findBtn.addEventListener('click', function() {
+    pendingPrefs = collectPrefs();
+    document.getElementById('email-gate').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  });
+}
+
+document.getElementById('gate-submit').addEventListener('click', function() {
+  var email = document.getElementById('gate-email').value.trim();
+  if (email && !email.includes('@')) {
+    document.getElementById('gate-email').style.borderColor = '#e87070';
+    return;
+  }
+  if (email) {
+    fetch('/api/save-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, source: 'packpath-gate' })
+    }).catch(function() {});
+  }
+  document.getElementById('email-gate').classList.remove('open');
+  document.body.style.overflow = '';
+  startSearch(pendingPrefs);
+});
+
+document.getElementById('gate-skip').addEventListener('click', function() {
+  document.getElementById('email-gate').classList.remove('open');
+  document.body.style.overflow = '';
+  startSearch(pendingPrefs);
+});
+
+document.getElementById('gate-email').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('gate-submit').click();
+});
+
+// ── LOADING SCREEN ──
+
+var loadingMessages = [
+  'Scouting trail conditions...',
+  'Checking water sources...',
+  'Cross-referencing permit zones...',
+  'Calculating elevation profiles...',
+  'Stitching together trail segments...',
+  'Ranking routes by fit score...',
+  'Almost there...'
+];
+var loadingTimer = null;
+var loadingMsgIdx = 0;
+var loadingBarVal = 0;
+
+function showLoading() {
+  document.querySelector('.form-container').style.display = 'none';
+  var pw = document.querySelector('.progress-wrap');
+  if (pw) pw.style.display = 'none';
+  document.getElementById('loading-screen').classList.add('show');
+  loadingMsgIdx = 0;
+  loadingBarVal = 5;
+  document.getElementById('loading-msg').textContent = loadingMessages[0];
+  document.getElementById('loading-bar').style.width = '5%';
+  loadingTimer = setInterval(function() {
+    loadingMsgIdx = Math.min(loadingMsgIdx + 1, loadingMessages.length - 1);
+    loadingBarVal = Math.min(loadingBarVal + 13, 88);
+    document.getElementById('loading-msg').textContent = loadingMessages[loadingMsgIdx];
+    document.getElementById('loading-bar').style.width = loadingBarVal + '%';
+  }, 2000);
+}
+
+function hideLoading() {
+  clearInterval(loadingTimer);
+  document.getElementById('loading-bar').style.width = '100%';
+  setTimeout(function() {
+    document.getElementById('loading-screen').classList.remove('show');
+  }, 300);
+}
+
+function showForm() {
+  document.querySelector('.form-container').style.display = 'block';
+  var pw = document.querySelector('.progress-wrap');
+  if (pw) pw.style.display = 'block';
+  document.getElementById('results-container').innerHTML = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── API CALL ──
+
+function startSearch(prefs) {
+  if (!prefs) return;
+  showLoading();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  fetch('/api/generate-routes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(prefs)
+  })
+  .then(function(res) {
+    if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Request failed'); });
+    return res.json();
+  })
+  .then(function(data) {
+    hideLoading();
+    if (!data.routes || !data.routes.length) throw new Error('No routes returned');
+    renderResults(data.routes, prefs);
+  })
+  .catch(function(err) {
+    hideLoading();
+    renderError(err.message);
+  });
+}
+
+// ── RESULTS RENDERER ──
+
+function slugify(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function renderResults(routes, prefs) {
+  window._liveRoutes = {};
+  routes.forEach(function(r) {
+    r._slug = slugify(r.name);
+    window._liveRoutes[r._slug] = r;
+  });
+
+  var container = document.getElementById('results-container');
+  var loc = prefs.location || prefs.regions || 'your area';
+  var html = '<div class="results-section">';
+  html += '<div class="back-btn" id="back-to-form">\u2190 New search</div>';
+  html += '<div class="results-heading">' + routes.length + ' routes found</div>';
+  html += '<div class="results-sub">Ranked by fit \u00b7 ' + loc + ' \u00b7 ' + (prefs.days||'?') + ' days \u00b7 ~' + (prefs.milesPerDay||'?') + ' mi/day</div>';
+
+  routes.forEach(function(r, i) {
+    var slug  = r._slug;
+    var score = Math.min(r.score || 80, 100);
+    var isBest = i === 0;
+
+    var pills = '';
+    var rt = r.routeType || 'Route';
+    var rtOk = rt.toLowerCase().includes('loop') || rt.toLowerCase().includes('lollipop');
+    pills += '<div class="stat-pill ' + (rtOk?'good':'warn') + '">' + (rtOk?'\u2713 ':'') + rt + '</div>';
+    pills += '<div class="stat-pill ' + (r.permitRequired?'warn':'good') + '">' + (r.permitRequired?'\u26a1 Permit req':'\u2713 No permit') + '</div>';
+    pills += '<div class="stat-pill">' + (r.totalMiles||'?') + ' mi total</div>';
+    pills += '<div class="stat-pill">+' + ((r.gainFt||0).toLocaleString()) + ' ft gain</div>';
+    if (r.waterSources) pills += '<div class="stat-pill good">' + r.waterSources + ' water sources</div>';
+    if (r.bestSeason)   pills += '<div class="stat-pill">' + r.bestSeason + '</div>';
+
+    var segsHtml = '';
+    if (r.segments && r.segments.length) {
+      segsHtml = '<div class="route-segments">';
+      r.segments.forEach(function(seg) {
+        var dotCls = seg.campName ? 'camp' : (seg.waterAtCamp ? 'water' : '');
+        var label  = seg.trailNames ? seg.trailNames.join(' \u2192 ') : seg.name;
+        var stat   = seg.miles + ' mi \u00b7 +' + (seg.gainFt||0).toLocaleString() + ' ft';
+        if (seg.campName) stat += ' \u00b7 Camp: ' + seg.campName;
+        segsHtml += '<div class="seg-row"><div class="seg-dot ' + dotCls + '"></div>';
+        segsHtml += '<div class="seg-name">Day ' + seg.day + ': ' + label + '</div>';
+        segsHtml += '<div class="seg-stat">' + stat + '</div></div>';
+        if (seg.notes) {
+          segsHtml += '<div class="seg-row"><div class="seg-dot" style="background:transparent"></div>';
+          segsHtml += '<div class="seg-stat" style="flex:1;font-style:italic;">' + seg.notes + '</div></div>';
+        }
+      });
+      segsHtml += '</div>';
+    }
+
+    var trHtml = '<div class="route-tradeoffs">';
+    (r.pros||[]).forEach(function(p){ trHtml += '<div class="tradeoff pro">+ ' + p + '</div>'; });
+    (r.cons||[]).forEach(function(c){ trHtml += '<div class="tradeoff con">\u2212 ' + c + '</div>'; });
+    trHtml += '</div>';
+
+    var gearHtml = '';
+    if (r.gearTips && r.gearTips[0]) {
+      gearHtml = '<div class="gear-tip" style="margin:0 16px 12px"><strong>Gear tip:</strong> ' + r.gearTips[0] + '</div>';
+    }
+
+    var affHtml = '';
+    if (r.affiliateContext) {
+      if (r.affiliateContext.topoAppEssential) {
+        affHtml = '<div class="affiliate-row"><div class="aff-text"><strong>Gaia GPS recommended</strong> \u2014 offline topo maps essential for this route</div><a class="aff-btn" href="https://www.gaiagps.com/?ref=packpath" target="_blank">Try free \u2192</a></div>';
+      } else if (r.affiliateContext.needsBearCanister) {
+        affHtml = '<div class="affiliate-row"><div class="aff-text"><strong>Bear canister required</strong> in this area</div><a class="aff-btn" href="https://www.rei.com/c/bear-canisters?utm_source=packpath" target="_blank">Shop REI \u2192</a></div>';
+      } else if (r.affiliateContext.offTrailNav) {
+        affHtml = '<div class="affiliate-row"><div class="aff-text"><strong>Off-trail navigation</strong> \u2014 onX Backcountry recommended</div><a class="aff-btn" href="https://www.onxmaps.com/backcountry/app?ref=packpath" target="_blank">Try onX \u2192</a></div>';
+      }
+    }
+
+    html += '<div class="route-card' + (isBest?' best-fit':'') + '">';
+    if (isBest) html += '<div class="route-banner">\u2605 Best fit \u2014 ' + score + '% match</div>';
+    html += '<div class="route-top">';
+    html += '<div class="route-rank-num">#' + r.rank + '</div>';
+    html += '<div class="route-info">';
+    html += '<div class="route-name">' + r.name + '</div>';
+    html += '<div class="route-desc">' + (r.summary||'') + '</div>';
+    html += '<div class="route-stats">' + pills + '</div>';
+    html += '</div></div>';
+    html += '<div class="route-fit-bar">';
+    html += '<div class="fit-label"><span>Fit score</span><span>' + score + ' / 100</span></div>';
+    html += '<div class="fit-track"><div class="fit-fill" style="width:0%;" data-w="' + score + '%"></div></div>';
+    html += '</div>';
+    if (r.bestFor) {
+      html += '<div style="padding:0 16px 10px 60px;font-size:12px;color:var(--text-light);font-style:italic;">Best for: ' + r.bestFor + '</div>';
+    }
+    if (r.permitDetails) {
+      html += '<div style="padding:0 16px 10px;font-size:12px;color:var(--text-light);font-style:italic;">' + r.permitDetails + '</div>';
+    }
+    html += segsHtml + trHtml + gearHtml + affHtml;
+    html += '<div class="route-actions">';
+    html += '<div class="route-action-btn" data-slug="' + slug + '" data-name="' + r.name.replace(/"/g,'&quot;') + '">&#8679; Send to app</div>';
+    html += '<div class="route-action-btn primary">Select this route &#8594;</div>';
+    html += '</div></div>';
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+
+  // Wire buttons
+  container.querySelectorAll('.route-action-btn[data-slug]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      openExport(btn.dataset.slug, btn.dataset.name);
+    });
+  });
+
+  document.getElementById('back-to-form').addEventListener('click', showForm);
+
+  // Animate fit bars
+  setTimeout(function() {
+    container.querySelectorAll('.fit-fill').forEach(function(el) {
+      el.style.transition = 'width 0.8s ease';
+      el.style.width = el.dataset.w;
+    });
+  }, 100);
+
+  container.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderError(msg) {
+  document.getElementById('results-container').innerHTML =
+    '<div class="form-container"><div class="error-card">' +
+    '<p>' + (msg || 'Something went wrong. Please try again.') + '</p>' +
+    '<button class="retry-btn" onclick="showForm()">Try again</button>' +
+    '</div></div>';
+}
+
+// ── EXPORT SHEET ──
+
+var currentRouteSlug = '';
+var currentRouteName = '';
+
+function openExport(slug, name) {
+  currentRouteSlug = slug;
+  currentRouteName = name;
+  document.getElementById('export-route-name').textContent = name;
+  var route = window._liveRoutes && window._liveRoutes[slug];
+  var wpts  = route && route.waypoints ? route.waypoints : [];
+  document.getElementById('export-coords').textContent =
+    wpts.length
+      ? wpts.map(function(w) { return w.lat.toFixed(4) + ', ' + w.lon.toFixed(4) + ' \u2014 ' + w.name; }).join('\n')
+      : 'Coordinates not available.';
+  document.getElementById('copy-btn').textContent = 'Copy coordinates';
+  document.getElementById('copy-btn').classList.remove('copied');
+  document.getElementById('export-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeExportBtn() {
+  document.getElementById('export-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeExport(e) {
+  if (e.target === document.getElementById('export-overlay')) closeExportBtn();
+}
+
+function getWaypoints(slug) {
+  var r = window._liveRoutes && window._liveRoutes[slug];
+  return r && r.waypoints ? r.waypoints : [];
+}
+
+function buildGPX(slug, name) {
+  var wpts = getWaypoints(slug);
+  var lines = [];
+  wpts.forEach(function(w) {
+    var ele = ((w.eleFt || 5000) * 0.3048).toFixed(1);
+    lines.push('      <trkpt lat="' + w.lat + '" lon="' + w.lon + '"><ele>' + ele + '</ele><n>' + w.name + '</n></trkpt>');
+  });
+  var wlines = [];
+  wpts.forEach(function(w) {
+    var ele = ((w.eleFt || 5000) * 0.3048).toFixed(1);
+    wlines.push('  <wpt lat="' + w.lat + '" lon="' + w.lon + '"><ele>' + ele + '</ele><n>' + w.name + '</n></wpt>');
+  });
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="PackPath" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><n>' + name + '</n></metadata>\n  <trk><n>' + name + '</n><type>Hiking</type><trkseg>\n' + lines.join('\n') + '\n  </trkseg></trk>\n' + wlines.join('\n') + '\n</gpx>';
+}
+
+function buildKML(slug, name) {
+  var wpts = getWaypoints(slug);
+  var coords = wpts.map(function(w) { return w.lon + ',' + w.lat + ',' + ((w.eleFt||5000)*0.3048).toFixed(1); }).join(' ');
+  var pmarks = wpts.map(function(w) {
+    return '  <Placemark><n>' + w.name + '</n><Point><coordinates>' + w.lon + ',' + w.lat + ',' + ((w.eleFt||5000)*0.3048).toFixed(1) + '</coordinates></Point></Placemark>';
+  }).join('\n');
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document><n>' + name + '</n>\n  <Placemark><n>' + name + '</n><LineString><coordinates>' + coords + '</coordinates></LineString></Placemark>\n' + pmarks + '\n</Document>\n</kml>';
+}
+
+function dlBlob(text, filename, mime) {
+  var a   = document.createElement('a');
+  a.href  = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = filename;
+  a.click();
+}
+
+function exportTo(target) {
+  var slug = currentRouteSlug, name = currentRouteName, fn = slug + '.gpx';
+  if (target === 'gpx-download') { dlBlob(buildGPX(slug,name), fn, 'application/gpx+xml'); closeExportBtn(); }
+  else if (target === 'kml')     { dlBlob(buildKML(slug,name), slug+'.kml', 'application/vnd.google-earth.kml+xml'); closeExportBtn(); }
+  else if (target === 'gaia')    { dlBlob(buildGPX(slug,name), fn, 'application/gpx+xml'); var a=document.createElement('a'); a.href='gaiagps://open'; a.click(); showToast('Gaia GPS','Trips \u2192 Import GPX \u2192 select the downloaded file'); closeExportBtn(); }
+  else if (target === 'onx')     { dlBlob(buildGPX(slug,name), fn, 'application/gpx+xml'); window.open('https://app.onxmaps.com/backcountry/map','_blank'); showToast('onX Backcountry','Trips \u2192 Import \u2192 select the downloaded GPX'); closeExportBtn(); }
+  else if (target === 'caltopo') { dlBlob(buildGPX(slug,name), fn, 'application/gpx+xml'); window.open('https://caltopo.com/map.html','_blank'); showToast('CalTopo','File \u2192 Import \u2192 select the GPX, or drag and drop onto the map'); closeExportBtn(); }
+  else if (target === 'alltrails'){ dlBlob(buildGPX(slug,name), fn, 'application/gpx+xml'); window.open('https://www.alltrails.com/explore','_blank'); showToast('AllTrails','Profile \u2192 My Trails \u2192 Import (Pro required)'); closeExportBtn(); }
+  else if (target === 'garmin')  { dlBlob(buildGPX(slug,name), fn, 'application/gpx+xml'); window.open('https://explore.garmin.com/trips','_blank'); showToast('Garmin Explore','Import Trip \u2192 select the downloaded GPX'); closeExportBtn(); }
+}
+
+function showToast(app, msg) {
+  var t = document.getElementById('app-note-toast');
+  if (t) t.remove();
+  t = document.createElement('div');
+  t.id = 'app-note-toast';
+  t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--pine);color:var(--white);font-size:13px;padding:12px 18px;border-radius:12px;z-index:2000;max-width:320px;text-align:center;line-height:1.5;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+  t.innerHTML = '<strong>' + app + ':</strong> ' + msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity 0.4s'; }, 4000);
+  setTimeout(function(){ t.remove(); }, 4500);
+}
+
+function copyCoords() {
+  var text = document.getElementById('export-coords').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      var btn = document.getElementById('copy-btn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(function(){ btn.textContent='Copy coordinates'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+}
+
+// ── QR CODE ──
+
+function openQR() {
+  document.getElementById('qr-modal-title').textContent = currentRouteName;
+  document.getElementById('qr-overlay').classList.add('open');
+  setTimeout(function() {
+    var canvas = document.getElementById('qr-canvas');
+    if (typeof QRCode !== 'undefined') renderQR(canvas);
+    else drawFallbackQR(canvas);
+  }, 100);
+}
+
+function closeQR(e) {
+  if (!e || e.target === document.getElementById('qr-overlay')) {
+    document.getElementById('qr-overlay').classList.remove('open');
+  }
+}
+
+function renderQR(canvas) {
+  try {
+    var ctx = canvas.getContext('2d'), size = 200;
+    var qr  = new QRCode('https://packpath.app/route/' + currentRouteSlug, { errorCorrectionLevel: 'M' });
+    var mods = qr.modules, n = mods.length;
+    var cell = Math.floor(size / (n + 2)), off = Math.floor((size - cell * n) / 2);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,size,size);
+    ctx.fillStyle = '#1E3A2F';
+    for (var r=0; r<n; r++) for (var c=0; c<n; c++) {
+      if (mods[r][c]) ctx.fillRect(off+c*cell, off+r*cell, cell, cell);
+    }
+  } catch(e) { drawFallbackQR(canvas); }
+}
+
+function drawFallbackQR(canvas) {
+  var ctx = canvas.getContext('2d'), s = 200;
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,s,s);
+  ctx.fillStyle='#1E3A2F';
+  [[10,10],[10,140],[140,10]].forEach(function(p){
+    ctx.fillRect(p[0],p[1],50,50);
+    ctx.fillStyle='#fff'; ctx.fillRect(p[0]+7,p[1]+7,36,36);
+    ctx.fillStyle='#1E3A2F'; ctx.fillRect(p[0]+14,p[1]+14,22,22);
+  });
+  ctx.fillStyle='#3D6B54'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('packpath.app/route',100,192);
+}
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+</body>
+</html>
