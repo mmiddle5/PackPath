@@ -566,6 +566,24 @@ input:focus, select:focus {
 .site-footer a { color: var(--sky); text-decoration: none; }
 .site-footer a:hover { text-decoration: underline; }
 
+/* ── Field validation ── */
+input.field-error,
+select.field-error {
+  border-color: var(--warning);
+}
+
+.checkbox-group.field-error {
+  outline: 2px solid var(--warning);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
+.error-hint {
+  font-size: 0.78rem;
+  color: var(--warning);
+  margin-top: 0.2rem;
+}
+
 /* ── Responsive ── */
 @media (max-width: 600px) {
   .form-row { flex-direction: column; }

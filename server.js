@@ -8,6 +8,7 @@
 //   GET  /api/routes/cached    — return the last validated output (no API cost)
 //   GET  /                     — serve the frontend
 
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import fs from 'node:fs/promises';
@@ -25,6 +26,10 @@ const API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-5-20250929';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const MAX_RETRIES = 2;
+
+// Prevent concurrent pipeline runs — one Claude call at a time.
+// A queue would be better at scale but this is the right call for a single-user tool.
+let pipelineRunning = false;
 
 const app = express();
 app.use(cors());
@@ -82,6 +87,12 @@ app.post('/api/routes', async (req, res) => {
     });
   }
 
+  if (pipelineRunning) {
+    return res.status(429).json({
+      error: 'A route search is already in progress. Please wait and try again.'
+    });
+  }
+
   const regionName = req.query.region || 'ansel-adams';
   const preferences = req.body;
 
@@ -99,6 +110,8 @@ app.post('/api/routes', async (req, res) => {
   const send = (event, data) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
+
+  pipelineRunning = true;
 
   try {
     // Step 0: Load region config
@@ -214,6 +227,8 @@ app.post('/api/routes', async (req, res) => {
   } catch (err) {
     send('error', { message: err.message, type: err.name || 'Error' });
     res.end();
+  } finally {
+    pipelineRunning = false;
   }
 });
 

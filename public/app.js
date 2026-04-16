@@ -1,6 +1,6 @@
 // app.js — PackPath frontend
 
-// ── State ─────────────────────────────────────────────────────────────
+// ── Section management ────────────────────────────────────────────────
 const sections = {
   form:     document.getElementById('form-section'),
   progress: document.getElementById('progress-section'),
@@ -8,7 +8,6 @@ const sections = {
   results:  document.getElementById('results-section'),
 };
 
-// ── Show/hide helpers ─────────────────────────────────────────────────
 function showSection(name) {
   Object.entries(sections).forEach(([key, el]) => {
     el.classList.toggle('hidden', key !== name);
@@ -17,59 +16,64 @@ function showSection(name) {
 
 function resetToForm() {
   showSection('form');
-  document.getElementById('submit-btn').disabled = false;
+  setSubmitState(false);
+  clearFieldErrors();
 }
+
+window.resetToForm = resetToForm;
 
 // ── Form submission ───────────────────────────────────────────────────
 document.getElementById('prefs-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const prefs = collectPreferences();
+  const prefs = collectAndValidate();
   if (!prefs) return;
   await runPipeline(prefs);
 });
 
-// ── Demo button — load cached output ─────────────────────────────────
+// ── Demo button ───────────────────────────────────────────────────────
 document.getElementById('demo-btn').addEventListener('click', async () => {
   showSection('progress');
   setProgress(5, 'Loading demo output…');
   try {
     const res = await fetch('/api/routes/cached');
+    const data = await res.json();
     if (!res.ok) {
-      const data = await res.json();
-      showError(data.error || 'No cached output available. Run the pipeline first.');
+      showError(data.error || 'No cached output available.');
       return;
     }
-    const data = await res.json();
     renderResults(data.routes);
   } catch (err) {
-    showError(err.message);
+    showError('Could not load demo output: ' + err.message);
   }
 });
 
-// ── Collect form values ───────────────────────────────────────────────
-function collectPreferences() {
+// ── Collect + validate form ───────────────────────────────────────────
+function collectAndValidate() {
+  clearFieldErrors();
+  let valid = true;
+
   const days = parseInt(document.getElementById('days').value);
   const miles = parseFloat(document.getElementById('miles').value);
   const elevation = document.getElementById('elevation').value;
   const crowd = document.getElementById('crowd').value;
   const experience = document.getElementById('experience').value;
   const notes = document.getElementById('notes').value.trim();
-
-  const scenery = [...document.querySelectorAll('input[name="scenery"]:checked')]
-    .map(cb => cb.value);
+  const scenery = [...document.querySelectorAll('input[name="scenery"]:checked')].map(cb => cb.value);
 
   if (isNaN(days) || days < 2 || days > 10) {
-    alert('Trip length must be between 2 and 10 days.');
-    return null;
+    setFieldError('days', 'Enter a number between 2 and 10');
+    valid = false;
   }
   if (isNaN(miles) || miles < 4 || miles > 20) {
-    alert('Miles per day must be between 4 and 20.');
-    return null;
+    setFieldError('miles', 'Enter a number between 4 and 20');
+    valid = false;
   }
   if (scenery.length === 0) {
-    alert('Select at least one scenery preference.');
-    return null;
+    setFieldError('scenery-group', 'Select at least one scenery type');
+    valid = false;
   }
+
+  if (!valid) return null;
 
   return {
     daysTarget: days,
@@ -85,10 +89,42 @@ function collectPreferences() {
   };
 }
 
-// ── Run pipeline via SSE ──────────────────────────────────────────────
+function setFieldError(fieldId, message) {
+  const field = document.getElementById(fieldId) ||
+                document.querySelector(`[data-error-id="${fieldId}"]`);
+  if (!field) return;
+  field.classList.add('field-error');
+  const existing = field.parentElement.querySelector('.error-hint');
+  if (!existing) {
+    const hint = document.createElement('span');
+    hint.className = 'error-hint';
+    hint.textContent = message;
+    field.parentElement.appendChild(hint);
+  }
+}
+
+function clearFieldErrors() {
+  document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
+  document.querySelectorAll('.error-hint').forEach(el => el.remove());
+}
+
+// ── Submit button state ───────────────────────────────────────────────
+function setSubmitState(loading) {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Finding routes…' : 'Find routes';
+}
+
+// ── SSE pipeline ──────────────────────────────────────────────────────
+// Uses a proper line-buffer parser. SSE format is:
+//   event: <type>\n
+//   data: <json>\n
+//   \n
+// We accumulate lines until we hit a blank line (message boundary),
+// then extract event + data from the buffered block.
 async function runPipeline(prefs) {
   showSection('progress');
-  document.getElementById('submit-btn').disabled = true;
+  setSubmitState(true);
 
   try {
     const response = await fetch('/api/routes', {
@@ -99,54 +135,64 @@ async function runPipeline(prefs) {
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({ error: response.statusText }));
-      showError(data.error || 'Server error');
+      showError(data.error || 'Server error. Check that ANTHROPIC_API_KEY is set.');
       return;
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
+    let rawBuffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop(); // keep incomplete line
-
-      for (const line of lines) {
-        if (line.startsWith('event: ')) {
-          // handled with next data line
-        } else if (line.startsWith('data: ')) {
-          const eventLine = lines[lines.indexOf(line) - 1] || '';
-          const eventType = eventLine.replace('event: ', '').trim();
-          const payload = JSON.parse(line.replace('data: ', ''));
-          handleSSEEvent(eventType, payload);
-        }
-      }
+      rawBuffer += decoder.decode(value, { stream: true });
+      rawBuffer = processSSEBuffer(rawBuffer);
     }
 
-    // Parse remaining buffer
-    const remaining = buffer.split('\n');
-    let lastEvent = '';
-    for (const line of remaining) {
-      if (line.startsWith('event: ')) {
-        lastEvent = line.replace('event: ', '').trim();
-      } else if (line.startsWith('data: ')) {
-        try {
-          const payload = JSON.parse(line.replace('data: ', ''));
-          handleSSEEvent(lastEvent, payload);
-        } catch {}
-      }
-    }
+    // Flush any remaining complete message in the buffer
+    processSSEBuffer(rawBuffer + '\n\n');
 
   } catch (err) {
-    showError(err.message);
+    showError('Connection error: ' + err.message);
   }
 }
 
-// ── SSE event handler ─────────────────────────────────────────────────
+// Processes all complete SSE messages in the buffer.
+// Returns the unconsumed remainder (incomplete message at the end).
+function processSSEBuffer(buffer) {
+  // SSE messages are separated by double newlines
+  const messages = buffer.split(/\n\n/);
+  // Last element is either empty or an incomplete message — keep it
+  const remainder = messages.pop();
+
+  for (const message of messages) {
+    if (!message.trim()) continue;
+    const lines = message.split('\n');
+    let eventType = 'message';
+    let dataLine = null;
+
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        eventType = line.slice(7).trim();
+      } else if (line.startsWith('data: ')) {
+        dataLine = line.slice(6);
+      }
+    }
+
+    if (dataLine !== null) {
+      try {
+        const payload = JSON.parse(dataLine);
+        handleSSEEvent(eventType, payload);
+      } catch (e) {
+        console.warn('SSE parse error:', e.message, 'data:', dataLine);
+      }
+    }
+  }
+
+  return remainder;
+}
+
 function handleSSEEvent(type, payload) {
   if (type === 'progress') {
     setProgress(payload.step, payload.message);
@@ -158,6 +204,15 @@ function handleSSEEvent(type, payload) {
 }
 
 // ── Progress UI ───────────────────────────────────────────────────────
+const STEP_LABELS = [
+  'Load region',
+  'Load clusters',
+  'Score routes',
+  'Build input',
+  'Generate narration',
+  'Validate',
+];
+
 function setProgress(step, message) {
   document.getElementById('progress-message').textContent = message;
   document.querySelectorAll('.step').forEach(el => {
@@ -171,18 +226,16 @@ function setProgress(step, message) {
 function showError(message) {
   document.getElementById('error-message').textContent = message;
   showSection('error');
-  document.getElementById('submit-btn').disabled = false;
+  setSubmitState(false);
 }
 
-// ── Render results ────────────────────────────────────────────────────
+// ── Results ───────────────────────────────────────────────────────────
 function renderResults(routes) {
   const grid = document.getElementById('routes-grid');
   grid.innerHTML = '';
-
   for (const route of routes) {
     grid.appendChild(buildRouteCard(route));
   }
-
   showSection('results');
 }
 
@@ -191,11 +244,13 @@ function buildRouteCard(route) {
   card.className = 'route-card';
 
   const gainK = (route.totalGainFt / 1000).toFixed(1);
+  const lossK = (route.totalLossFt / 1000).toFixed(1);
   const archClass = `archetype-${route.archetype}`;
+  const milesPerDay = (route.totalMiles / route.days).toFixed(1);
 
   card.innerHTML = `
     <div class="route-card-header">
-      <div>
+      <div class="route-title">
         <div class="route-name">${esc(route.routeName)}</div>
         <span class="route-archetype ${archClass}">${esc(route.archetype)}</span>
       </div>
@@ -209,22 +264,29 @@ function buildRouteCard(route) {
           <span class="stat-label">Duration</span>
         </div>
         <div class="stat">
+          <span class="stat-value">${milesPerDay} mi</span>
+          <span class="stat-label">Per day</span>
+        </div>
+        <div class="stat">
           <span class="stat-value">+${gainK}k ft</span>
           <span class="stat-label">Gain</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">-${lossK}k ft</span>
+          <span class="stat-label">Loss</span>
         </div>
       </div>
     </div>
 
     <div class="route-summary">${esc(route.summary)}</div>
-
     <div class="best-for"><strong>Best for:</strong> ${esc(route.bestFor)}</div>
 
     <button class="itinerary-toggle" aria-expanded="false">
       Day-by-day itinerary
       <span class="toggle-icon">▼</span>
     </button>
-    <div class="itinerary-body">
-      ${route.segments.map(seg => buildDayRow(seg)).join('')}
+    <div class="itinerary-body" role="region">
+      ${route.segments.map(seg => buildDayRow(seg, route.days)).join('')}
     </div>
 
     <div class="pros-cons">
@@ -238,14 +300,13 @@ function buildRouteCard(route) {
       </div>
     </div>
 
-    ${route.gearTips && route.gearTips.length ? `
+    ${route.gearTips?.length ? `
     <div class="gear-tips">
       <h4>Gear tips</h4>
       <ul>${route.gearTips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
     </div>` : ''}
   `;
 
-  // Toggle itinerary
   const toggle = card.querySelector('.itinerary-toggle');
   const body = card.querySelector('.itinerary-body');
   toggle.addEventListener('click', () => {
@@ -257,17 +318,14 @@ function buildRouteCard(route) {
   return card;
 }
 
-function buildDayRow(seg) {
-  const trails = seg.trailNames
-    .filter(t => t && t !== '(unnamed)')
-    .join(', ');
-
+function buildDayRow(seg, totalDays) {
+  const trails = seg.trailNames.filter(t => t && t !== '(unnamed)').join(', ');
   const gainStr = seg.gainFt ? `+${seg.gainFt.toLocaleString()} ft` : '';
   const lossStr = seg.lossFt ? `-${seg.lossFt.toLocaleString()} ft` : '';
 
   return `
     <div class="day-row">
-      <div class="day-label">Day ${seg.day}</div>
+      <div class="day-label">Day ${seg.day}<span class="day-of-total"> / ${totalDays}</span></div>
       <div class="day-content">
         <div class="day-stats">
           <span class="day-stat">${seg.miles} mi</span>
@@ -281,7 +339,7 @@ function buildDayRow(seg) {
   `;
 }
 
-// ── Escape HTML ───────────────────────────────────────────────────────
+// ── HTML escape ───────────────────────────────────────────────────────
 function esc(str) {
   if (!str) return '';
   return String(str)
@@ -290,6 +348,3 @@ function esc(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
-
-// ── Expose resetToForm globally for inline onclick ────────────────────
-window.resetToForm = resetToForm;

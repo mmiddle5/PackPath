@@ -1,6 +1,25 @@
 {
-  "name": "packpath-data",
-  "version": "0.0.1",
+  "name": "packpath",
+  "version": "1.0.0",
+  "description": "AI backpacking route planner — real OSM geometry, deterministic scoring, Claude narration.",
   "type": "module",
-  "private": true
+  "scripts": {
+    "start": "node server.js",
+    "pipeline": "node test-narration-real.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
+    "fetch": "node fetch-overpass.js",
+    "enrich": "node enrich-elevation.js",
+    "loops": "node find-loops.js"
+  },
+  "dependencies": {
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.22.1"
+  },
+  "devDependencies": {
+    "vitest": "4.1.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
