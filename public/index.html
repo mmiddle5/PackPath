@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PackPath — Sierra Route Planner</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-mark">▲</span>
+        <span class="logo-text">PackPath</span>
+      </div>
+      <p class="tagline">Real trails. Real geometry. No hallucinated routes.</p>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ── Preferences form ── -->
+    <section id="form-section" class="section">
+      <div class="container">
+        <h2 class="section-title">Plan your route</h2>
+        <p class="section-subtitle">Pilot region: <strong>Ansel Adams Wilderness, Sierra Nevada</strong></p>
+
+        <form id="prefs-form" novalidate>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="days">Trip length (days)</label>
+              <input type="number" id="days" name="days" min="2" max="10" value="4" required />
+            </div>
+            <div class="field">
+              <label for="miles">Miles per day</label>
+              <input type="number" id="miles" name="miles" min="4" max="20" value="10" required />
+            </div>
+            <div class="field">
+              <label for="elevation">Elevation tolerance</label>
+              <select id="elevation" name="elevation">
+                <option value="easy">Easy (under 1,500 ft/day)</option>
+                <option value="moderate" selected>Moderate (1,500–3,000 ft/day)</option>
+                <option value="hard">Hard (3,000+ ft/day)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field field--wide">
+              <label>Scenery preferences</label>
+              <div class="checkbox-group" id="scenery-group" data-error-id="scenery-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" name="scenery" value="lakes" checked /> Lakes
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="scenery" value="peaks" checked /> Peaks
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="scenery" value="passes" /> Passes
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="scenery" value="waterfalls" /> Waterfalls
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="scenery" value="forest" /> Forest
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" name="scenery" value="alpine" /> Alpine
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="crowd">Crowd preference</label>
+              <select id="crowd" name="crowd">
+                <option value="quiet">Quiet — off the beaten path</option>
+                <option value="mixed" selected>Mixed — some solitude, some company</option>
+                <option value="social">Social — popular trails OK</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="experience">Experience level</label>
+              <select id="experience" name="experience">
+                <option value="beginner">Beginner</option>
+                <option value="intermediate" selected>Intermediate</option>
+                <option value="advanced">Advanced</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="field field--wide">
+              <label for="notes">Notes <span class="optional">(optional)</span></label>
+              <input type="text" id="notes" name="notes"
+                placeholder="e.g. July trip, no permits if possible, willing to drive from Bishop" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="submit-btn" class="btn btn--primary">
+              Find routes
+            </button>
+            <button type="button" id="demo-btn" class="btn btn--secondary">
+              Load demo output
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </section>
+
+    <!-- ── Progress ── -->
+    <section id="progress-section" class="section hidden">
+      <div class="container">
+        <div class="progress-wrap">
+          <div class="progress-spinner"></div>
+          <p id="progress-message" class="progress-message">Starting pipeline…</p>
+          <div class="progress-steps">
+            <div class="step" data-step="0">Load region</div>
+            <div class="step" data-step="1">Load clusters</div>
+            <div class="step" data-step="2">Score routes</div>
+            <div class="step" data-step="3">Build input</div>
+            <div class="step" data-step="4">Generate narration</div>
+            <div class="step" data-step="5">Validate</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Error ── -->
+    <section id="error-section" class="section hidden">
+      <div class="container">
+        <div class="error-box">
+          <h3>Something went wrong</h3>
+          <p id="error-message"></p>
+          <button class="btn btn--secondary" onclick="resetToForm()">Try again</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Results ── -->
+    <section id="results-section" class="section hidden">
+      <div class="container">
+        <div class="results-header">
+          <h2 class="section-title">Your routes</h2>
+          <button class="btn btn--ghost" onclick="resetToForm()">← New search</button>
+        </div>
+        <div id="routes-grid" class="routes-grid"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>Trail geometry from <a href="https://www.openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a>.
+         Elevation from <a href="https://open-elevation.com" target="_blank" rel="noopener">Open-Elevation SRTM</a>.
+         Narration by Claude. Numbers never touched by AI.</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
