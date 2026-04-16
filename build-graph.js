@@ -6,32 +6,41 @@
 // Each segment carries: name, length_miles, gain_ft, loss_ft, point_geometry,
 // and nearby features (water, peaks, passes) within a buffer.
 //
-// Elevation is left as null in this pass — we'll fill it in a separate step
+// Elevation is left as null in this pass — filled in by enrich-elevation.js
 // from a DEM service so the graph builder stays pure and testable.
 
-const EARTH_RADIUS_MI = 3958.8;
-const FEATURE_BUFFER_MI = 0.06; // ~100m — "you can see/reach it from the trail"
+import { haversineMiles } from './geo-utils.js';
 
-function haversineMiles(lat1, lon1, lat2, lon2) {
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_MI * Math.asin(Math.sqrt(a));
-}
+// ── Buffer distances ──────────────────────────────────────────────────
+// How close a feature must be to a trail segment to be "attached" to it.
+// These were calibrated against known Sierra trail/feature relationships.
+const FEATURE_BUFFER_MI = 0.06;  // ~100m — "you can see/reach it from the trail"
+const PEAK_BUFFER_MI = 0.93;     // ~1500m — peaks visible from trail
+const PASS_BUFFER_MI = 0.25;     // ~400m — passes are navigational waypoints, often slightly off trail centerline
+const LAKE_BUFFER_MI = 0.25;     // ~400m — trails wrap around shorelines
+const STREAM_BUFFER_MI = 0.031;  // ~50m — trails follow streams closely
+
+// ── Boundary detection ────────────────────────────────────────────────
+// Junctions within this distance of the query bbox edge are likely clipped
+// trails, not real dead ends. The loop search skips them as start candidates.
+const BOUNDARY_TOLERANCE_DEG = 0.005; // ~0.3 mi
+
+// ── Micro-segment merging ─────────────────────────────────────────────
+// OSM mappers sometimes split trails into tiny bridge/connector pieces.
+// Segments shorter than this threshold are merged into a neighbour rather
+// than being treated as independent segments (which would sever the trail).
+const MICRO_THRESHOLD_MI = 0.01;
 
 function classifyElements(elements) {
   const nodes = new Map(); // id -> {lat, lon, tags}
-  const trailWays = []; // ways that are walkable trails
-  const waterWays = []; // streams, rivers
-  const lakeWays = [];  // named lake/pond polygons
+  const trailWays = [];
+  const waterWays = [];
+  const lakeWays = [];
   const trailheadNodes = [];
   const peakNodes = [];
   const passNodes = [];
   const springNodes = [];
-  const landmarkNodes = []; // waterfalls, attractions, viewpoints, historic, geological, localities
+  const landmarkNodes = [];
 
   for (const el of elements) {
     if (el.type === 'node') {
@@ -42,18 +51,16 @@ function classifyElements(elements) {
       }
       if (t.natural === 'peak' && t.name) {
         // Filter out terrain features misclassified as peaks in OSM/GNIS.
-        // Names containing stairway, gap, notch, chute, step, bench, ledge, shelf
-        // indicate terrain features, not summits.
+        // Names containing these words indicate terrain features, not summits.
         const NON_PEAK_PATTERN = /stairway|stairs|gap|notch|chute|steps?(?:\s|$)|bench|ledge|shelf|ramp/i;
         if (!NON_PEAK_PATTERN.test(t.name)) {
           peakNodes.push(el);
         } else {
-          landmarkNodes.push(el);  // reclassify as landmark
+          landmarkNodes.push(el);
         }
       }
       if (t.mountain_pass === 'yes' || t.natural === 'saddle') passNodes.push(el);
       if (t.natural === 'spring') springNodes.push(el);
-      // Broader landmark categories
       if (t.natural === 'waterfall') landmarkNodes.push(el);
       if (t.natural === 'cliff' && t.name) landmarkNodes.push(el);
       if (t.tourism === 'attraction' && t.name) landmarkNodes.push(el);
@@ -92,10 +99,9 @@ function classifyElements(elements) {
 function findJunctions(trailWays, trailheadNodeIds) {
   // A node is a junction if it appears in 2+ trail ways, OR it's a trailhead,
   // OR it's an endpoint of any trail way (terminus / dead end).
-  const nodeUsage = new Map(); // nodeId -> count of trail ways it appears in
+  const nodeUsage = new Map();
 
   for (const way of trailWays) {
-    // Use a Set so a way that loops back on itself doesn't double-count.
     for (const nodeId of new Set(way.nodes)) {
       nodeUsage.set(nodeId, (nodeUsage.get(nodeId) || 0) + 1);
     }
@@ -115,7 +121,6 @@ function findJunctions(trailWays, trailheadNodeIds) {
 }
 
 function splitWayAtJunctions(way, junctions) {
-  // Walk the way's node list and break it into sub-segments at every junction.
   const segments = [];
   let current = [way.nodes[0]];
   for (let i = 1; i < way.nodes.length; i++) {
@@ -141,10 +146,7 @@ function segmentLengthMiles(nodeIds, nodes) {
 }
 
 function segmentBoundingBox(nodeIds, nodes) {
-  let minLat = Infinity,
-    maxLat = -Infinity,
-    minLon = Infinity,
-    maxLon = -Infinity;
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
   for (const id of nodeIds) {
     const n = nodes.get(id);
     if (!n) continue;
@@ -157,10 +159,8 @@ function segmentBoundingBox(nodeIds, nodes) {
 }
 
 function findNearbyFeatures(segmentNodeIds, nodes, featureNodes, bufferMi) {
-  // Cheap pass: check each feature against the segment's bbox first,
-  // then do the per-point haversine only for features inside the bbox.
   const bbox = segmentBoundingBox(segmentNodeIds, nodes);
-  const latBuffer = bufferMi / 69; // ~degrees latitude per mile
+  const latBuffer = bufferMi / 69;
   const nearby = [];
 
   for (const feature of featureNodes) {
@@ -170,7 +170,6 @@ function findNearbyFeatures(segmentNodeIds, nodes, featureNodes, bufferMi) {
     if (feature.lon < bbox.minLon - lonBuffer) continue;
     if (feature.lon > bbox.maxLon + lonBuffer) continue;
 
-    // Closest distance from feature to any node on the segment
     let minDist = Infinity;
     for (const id of segmentNodeIds) {
       const n = nodes.get(id);
@@ -193,35 +192,28 @@ function findNearbyFeatures(segmentNodeIds, nodes, featureNodes, bufferMi) {
   return nearby;
 }
 
-const PEAK_BUFFER_MI = 0.93; // ~1500m — peaks visible from trail
-const LAKE_BUFFER_MI = 0.25; // ~400m — trails wrap around shorelines
-const STREAM_BUFFER_MI = 0.031; // ~50m — trails follow streams closely
-
 function findNearbyPeaks(segmentNodeIds, nodes, peakNodes, bufferMi) {
-  // Like findNearbyFeatures but with a closest-peak-per-segment rule:
-  // only attach a named peak if no other named peak is closer to this segment.
-  // This prevents a segment under Banner Peak from also getting Mount Ritter
-  // and Mount Davis just because they're in the wider buffer.
+  // Attach a named peak only if it's the closest peak to this segment,
+  // OR if it's within the tight FEATURE_BUFFER_MI (definitely on-trail).
+  // This prevents a segment under Banner Peak from also claiming Mount Ritter
+  // and Mount Davis just because they're within the wider peak buffer.
   const candidates = findNearbyFeatures(segmentNodeIds, nodes, peakNodes, bufferMi);
   if (candidates.length <= 1) return candidates;
 
-  // Sort by distance, then keep only the closest peak.
-  // Also keep any peak that's within the tight buffer (FEATURE_BUFFER_MI) regardless.
   candidates.sort((a, b) => a.distMi - b.distMi);
   const closest = candidates[0];
   const result = [closest];
   for (let i = 1; i < candidates.length; i++) {
-    if (candidates[i].distMi <= FEATURE_BUFFER_MI) {
-      result.push(candidates[i]); // very close — definitely visible from trail
+    // Keep secondary peaks within half the buffer — genuine ridge traversals
+    // where two named peaks are both close to the trail.
+    if (candidates[i].distMi <= bufferMi / 2) {
+      result.push(candidates[i]);
     }
   }
   return result;
 }
 
 function findNearbyPolygonFeatures(segmentNodeIds, nodes, wayFeatures, bufferMi) {
-  // Like findNearbyFeatures but for way-based features (lakes, etc.).
-  // For each way feature, find the closest distance from any node in the
-  // way's node list to any node in the segment.  Attach if within buffer.
   const segBbox = segmentBoundingBox(segmentNodeIds, nodes);
   const latBuffer = bufferMi / 69;
   const nearby = [];
@@ -230,7 +222,6 @@ function findNearbyPolygonFeatures(segmentNodeIds, nodes, wayFeatures, bufferMi)
     const name = way.tags?.name;
     if (!name) continue;
 
-    // Quick bbox reject: compute the way's bbox and check overlap
     let wMinLat = Infinity, wMaxLat = -Infinity, wMinLon = Infinity, wMaxLon = -Infinity;
     for (const nid of way.nodes) {
       const n = nodes.get(nid);
@@ -247,8 +238,6 @@ function findNearbyPolygonFeatures(segmentNodeIds, nodes, wayFeatures, bufferMi)
     if (wMinLon > segBbox.maxLon + lonBuffer) continue;
     if (wMaxLon < segBbox.minLon - lonBuffer) continue;
 
-    // Detailed check: closest distance between any way node and any segment node.
-    // Sample the way nodes (for large polygons, every 3rd node is plenty).
     let minDist = Infinity;
     const step = Math.max(1, Math.floor(way.nodes.length / 40));
     for (let wi = 0; wi < way.nodes.length; wi += step) {
@@ -259,7 +248,7 @@ function findNearbyPolygonFeatures(segmentNodeIds, nodes, wayFeatures, bufferMi)
         if (!sn) continue;
         const d = haversineMiles(wn.lat, wn.lon, sn.lat, sn.lon);
         if (d < minDist) minDist = d;
-        if (d < bufferMi) break; // early exit — already close enough
+        if (d < bufferMi) break;
       }
       if (minDist < bufferMi) break;
     }
@@ -279,10 +268,7 @@ function findNearbyPolygonFeatures(segmentNodeIds, nodes, wayFeatures, bufferMi)
 }
 
 function computeBbox(nodes) {
-  let minLat = Infinity,
-    maxLat = -Infinity,
-    minLon = Infinity,
-    maxLon = -Infinity;
+  let minLat = Infinity, maxLat = -Infinity, minLon = Infinity, maxLon = -Infinity;
   for (const n of nodes.values()) {
     if (n.lat < minLat) minLat = n.lat;
     if (n.lat > maxLat) maxLat = n.lat;
@@ -291,8 +277,6 @@ function computeBbox(nodes) {
   }
   return { minLat, maxLat, minLon, maxLon };
 }
-
-const BOUNDARY_TOLERANCE_DEG = 0.005; // ~0.3 mi
 
 function isOnBoundary(node, bbox) {
   return (
@@ -309,15 +293,12 @@ export function buildGraph(overpassData, options = {}) {
   const { nodes, trailWays, waterWays, peakNodes, passNodes, springNodes, landmarkNodes, lakeWays, trailheadNodes } =
     classified;
 
-  const trailheadIds = new Set(trailheadNodes.map((n) => n.id));
+  const trailheadIds = new Set(trailheadNodes.map(n => n.id));
   const junctions = findJunctions(trailWays, trailheadIds);
-  // Use the query bbox if the caller provided one (real production usage).
-  // Otherwise fall back to the data-derived bbox, but skip boundary detection
-  // because every extreme node would falsely look like a boundary.
   const bbox = options.queryBbox || computeBbox(nodes);
   const detectBoundary = !!options.queryBbox;
 
-  // Phase 1: collect all raw sub-segments per way, with their node lists.
+  // Phase 1: collect all raw sub-segments per way
   const rawSubs = [];
   for (const way of trailWays) {
     const subs = splitWayAtJunctions(way, junctions);
@@ -326,16 +307,9 @@ export function buildGraph(overpassData, options = {}) {
     }
   }
 
-  // Phase 2: merge micro-segments (< 0.01 mi) into a neighbour so they act as
-  // connectors instead of being silently dropped — which was severing trails
-  // at OSM way boundaries where mappers split a way into tiny bridge pieces.
-  //
-  // Strategy: for each micro-segment, find an adjacent sub-segment that shares
-  // its start or end node and merge the node lists.  If no neighbour exists
-  // (isolated junk), drop it as before.
-  const MICRO_THRESHOLD = 0.01; // miles
-
-  // Index: junction node -> [indices into rawSubs that touch it]
+  // Phase 2: merge micro-segments into neighbours.
+  // OSM mappers split trails at bridge/culvert boundaries, producing tiny
+  // connector pieces that would otherwise sever the trail graph.
   const nodeToSubs = new Map();
   for (let i = 0; i < rawSubs.length; i++) {
     const sub = rawSubs[i];
@@ -347,49 +321,36 @@ export function buildGraph(overpassData, options = {}) {
     }
   }
 
-  const merged = new Set(); // indices already consumed by a merge
+  const merged = new Set();
   for (let i = 0; i < rawSubs.length; i++) {
     const sub = rawSubs[i];
     const len = segmentLengthMiles(sub.nodeIds, nodes);
-    if (len >= MICRO_THRESHOLD) continue; // not micro — leave it alone
+    if (len >= MICRO_THRESHOLD_MI) continue;
 
-    // Try to merge into a neighbour at either endpoint
-    const endpoints = [
-      sub.nodeIds[0],
-      sub.nodeIds[sub.nodeIds.length - 1],
-    ];
+    const endpoints = [sub.nodeIds[0], sub.nodeIds[sub.nodeIds.length - 1]];
     let didMerge = false;
     for (const ep of endpoints) {
-      const neighbours = (nodeToSubs.get(ep) || []).filter(
-        (j) => j !== i && !merged.has(j)
-      );
+      const neighbours = (nodeToSubs.get(ep) || []).filter(j => j !== i && !merged.has(j));
       if (neighbours.length === 0) continue;
 
-      // Pick the first non-micro neighbour; fall back to any neighbour.
       const target =
-        neighbours.find(
-          (j) => segmentLengthMiles(rawSubs[j].nodeIds, nodes) >= MICRO_THRESHOLD
-        ) ?? neighbours[0];
+        neighbours.find(j => segmentLengthMiles(rawSubs[j].nodeIds, nodes) >= MICRO_THRESHOLD_MI) ??
+        neighbours[0];
 
       const tgt = rawSubs[target];
       const tgtStart = tgt.nodeIds[0];
       const tgtEnd = tgt.nodeIds[tgt.nodeIds.length - 1];
 
-      // Splice the micro node list onto the correct end of the target.
       if (tgtEnd === sub.nodeIds[0]) {
-        // target ... ep -> micro ...
         tgt.nodeIds = tgt.nodeIds.concat(sub.nodeIds.slice(1));
       } else if (tgtStart === sub.nodeIds[sub.nodeIds.length - 1]) {
-        // micro ... ep -> target ...
         tgt.nodeIds = sub.nodeIds.slice(0, -1).concat(tgt.nodeIds);
       } else if (tgtEnd === sub.nodeIds[sub.nodeIds.length - 1]) {
-        // target ... ep <- micro (reversed)
         tgt.nodeIds = tgt.nodeIds.concat(sub.nodeIds.slice(0, -1).reverse());
       } else if (tgtStart === sub.nodeIds[0]) {
-        // micro (reversed) -> ep ... target
         tgt.nodeIds = sub.nodeIds.slice(1).reverse().concat(tgt.nodeIds);
       } else {
-        continue; // shouldn't happen — endpoints didn't match
+        continue;
       }
 
       merged.add(i);
@@ -397,30 +358,29 @@ export function buildGraph(overpassData, options = {}) {
       break;
     }
 
-    // No neighbour found — truly isolated junk, drop it.
     if (!didMerge) merged.add(i);
   }
 
-  // Phase 3: build final segment objects from surviving sub-segments.
+  // Phase 3: build final segment objects
   const segments = [];
   for (let i = 0; i < rawSubs.length; i++) {
     if (merged.has(i)) continue;
     const { way, nodeIds: sub } = rawSubs[i];
     const lengthMi = segmentLengthMiles(sub, nodes);
-    if (lengthMi < 0.001) continue; // safety net for degenerate merges
+    if (lengthMi < 0.001) continue;
     segments.push({
       wayId: way.id,
       name: way.tags?.name || null,
       sacScale: way.tags?.sac_scale || null,
       startNode: sub[0],
       endNode: sub[sub.length - 1],
-      nodeIds: sub.slice(), // full ordered node list for elevation pass
+      nodeIds: sub.slice(),
       nodeCount: sub.length,
       lengthMi: Number(lengthMi.toFixed(3)),
-      gainFt: null, // filled in by elevation pass
+      gainFt: null,
       lossFt: null,
       nearbyPeaks: findNearbyPeaks(sub, nodes, peakNodes, PEAK_BUFFER_MI),
-      nearbyPasses: findNearbyFeatures(sub, nodes, passNodes, FEATURE_BUFFER_MI),
+      nearbyPasses: findNearbyFeatures(sub, nodes, passNodes, PASS_BUFFER_MI),
       nearbySprings: findNearbyFeatures(sub, nodes, springNodes, FEATURE_BUFFER_MI),
       nearbyLandmarks: findNearbyFeatures(sub, nodes, landmarkNodes, FEATURE_BUFFER_MI),
       nearbyLakes: findNearbyPolygonFeatures(sub, nodes, lakeWays, LAKE_BUFFER_MI),
@@ -428,7 +388,6 @@ export function buildGraph(overpassData, options = {}) {
     });
   }
 
-  // Build adjacency: junctionId -> segments touching it
   const adjacency = new Map();
   for (const seg of segments) {
     for (const j of [seg.startNode, seg.endNode]) {
@@ -437,9 +396,6 @@ export function buildGraph(overpassData, options = {}) {
     }
   }
 
-  // Flag boundary junctions: a junction with degree 1 (one segment touching it)
-  // that sits on the bbox edge is almost certainly a clipped trail, not a real
-  // dead end. The graph search will skip these as start/end candidates.
   const boundaryJunctions = new Set();
   if (detectBoundary) {
     for (const [juncId, segs] of adjacency) {
@@ -450,12 +406,12 @@ export function buildGraph(overpassData, options = {}) {
   }
 
   return {
-    nodes, // raw OSM nodes (for coordinate lookup)
+    nodes,
     bbox,
-    junctions, // Set of junction node IDs
-    boundaryJunctions, // Set of clipped-at-bbox junctions
-    segments, // Array of segments
-    adjacency, // junctionId -> [segments]
+    junctions,
+    boundaryJunctions,
+    segments,
+    adjacency,
     trailheads: trailheadNodes,
     peaks: peakNodes,
     passes: passNodes,
@@ -467,12 +423,11 @@ export function buildGraph(overpassData, options = {}) {
 }
 
 export function summarizeGraph(graph) {
-  const namedSegs = graph.segments.filter((s) => s.name);
-  const trailNames = new Set(namedSegs.map((s) => s.name));
+  const namedSegs = graph.segments.filter(s => s.name);
+  const trailNames = new Set(namedSegs.map(s => s.name));
   const totalMi = graph.segments.reduce((sum, s) => sum + s.lengthMi, 0);
   const namedMi = namedSegs.reduce((sum, s) => sum + s.lengthMi, 0);
 
-  // Connected component analysis — are all trails in one network or scattered?
   const visited = new Set();
   const components = [];
   for (const startJunc of graph.junctions) {
