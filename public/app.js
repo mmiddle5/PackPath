@@ -229,17 +229,34 @@ function showError(message) {
   setSubmitState(false);
 }
 
-// ── Results ───────────────────────────────────────────────────────────
-function renderResults(routes) {
-  const grid = document.getElementById('routes-grid');
-  grid.innerHTML = '';
-  for (const route of routes) {
-    grid.appendChild(buildRouteCard(route));
+// ── Map instances — track by route index to avoid double-init ────────
+const mapInstances = new Map();
+
+function destroyMaps() {
+  for (const map of mapInstances.values()) {
+    map.remove();
   }
-  showSection('results');
+  mapInstances.clear();
 }
 
-function buildRouteCard(route) {
+// ── Results ───────────────────────────────────────────────────────────
+function renderResults(routes) {
+  destroyMaps();
+  const grid = document.getElementById('routes-grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < routes.length; i++) {
+    grid.appendChild(buildRouteCard(routes[i], i));
+  }
+  showSection('results');
+  // Init maps after DOM is painted
+  requestAnimationFrame(() => {
+    for (let i = 0; i < routes.length; i++) {
+      initMap(routes[i], i);
+    }
+  });
+}
+
+function buildRouteCard(route, index) {
   const card = document.createElement('article');
   card.className = 'route-card';
 
@@ -278,8 +295,13 @@ function buildRouteCard(route) {
       </div>
     </div>
 
-    <div class="route-summary">${esc(route.summary)}</div>
-    <div class="best-for"><strong>Best for:</strong> ${esc(route.bestFor)}</div>
+    <div class="route-card-body">
+      <div class="route-map" id="map-${index}" aria-label="Map showing approximate location of ${esc(route.routeName)}"></div>
+      <div class="route-text">
+        <div class="route-summary">${esc(route.summary)}</div>
+        <div class="best-for"><strong>Best for:</strong> ${esc(route.bestFor)}</div>
+      </div>
+    </div>
 
     <button class="itinerary-toggle" aria-expanded="false">
       Day-by-day itinerary
@@ -316,6 +338,52 @@ function buildRouteCard(route) {
   });
 
   return card;
+}
+
+// ── Map initialisation ────────────────────────────────────────────────
+// Uses OpenTopoMap — free, no API key, topographic tiles ideal for trail planning.
+// Falls back gracefully if Leaflet isn't loaded (e.g. offline).
+function initMap(route, index) {
+  if (typeof L === 'undefined') return;
+
+  const container = document.getElementById(`map-${index}`);
+  if (!container) return;
+
+  const lat = route.geoCenter?.lat;
+  const lon = route.geoCenter?.lon;
+  if (!lat || !lon) {
+    container.classList.add('map--no-data');
+    container.textContent = 'Location data unavailable';
+    return;
+  }
+
+  const map = L.map(container, {
+    center: [lat, lon],
+    zoom: 11,
+    zoomControl: true,
+    scrollWheelZoom: false,  // prevent accidental zoom while scrolling the page
+    attributionControl: true,
+  });
+
+  L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 15,
+    attribution: '© <a href="https://opentopomap.org">OpenTopoMap</a> ' +
+                 '(<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)',
+  }).addTo(map);
+
+  // Custom marker — pine green circle matching the brand
+  const markerIcon = L.divIcon({
+    className: 'route-marker',
+    html: '<div class="route-marker-inner">▲</div>',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+
+  L.marker([lat, lon], { icon: markerIcon })
+    .addTo(map)
+    .bindPopup(`<strong>${route.routeName}</strong><br>${route.totalMiles} mi · ${route.days} days`);
+
+  mapInstances.set(index, map);
 }
 
 function buildDayRow(seg, totalDays) {

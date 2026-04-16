@@ -7,6 +7,7 @@
     "totalGainFt": 11707,
     "totalLossFt": 11705,
     "days": 4,
+    "geoCenter": { "lat": 37.72, "lon": -119.08 },
     "summary": "A 37.5-mile loop linking Shadow Lake, Ediza Lake, and Iceberg Lake beneath the Minarets, with a side trip to historic Minaret Mine. The route uses 10 miles of John Muir Trail and Pacific Crest Trail alongside quieter trails like Minaret Creek Trail and Shadow Creek Trail. You'll pass 25 named features including six major lakes and four Minaret peaks.",
     "bestFor": "Intermediate backpackers seeking alpine lake variety with moderate crowds and a mix of iconic trail miles and quieter side routes.",
     "segments": [
@@ -59,6 +60,7 @@
     "totalGainFt": 10860,
     "totalLossFt": 10902,
     "days": 4,
+    "geoCenter": { "lat": 37.78, "lon": -119.15 },
     "summary": "A 39.4-mile loop exploring the King Creek drainage, Holcomb Lake, Ashley Lake, and the Middle Fork San Joaquin River, with a 15.7-mile northern excursion on Mammoth Trail. The route uses 7.4 miles of John Muir Trail and Pacific Crest Trail but spends most miles on quieter trails beneath Iron Mountain and Red Top Mountain. You'll pass 12 named features including three alpine lakes.",
     "bestFor": "Intermediate backpackers willing to trade iconic scenery for solitude, and comfortable with a long single day on Mammoth Trail.",
     "segments": [
@@ -111,6 +113,7 @@
     "totalGainFt": 12824,
     "totalLossFt": 12824,
     "days": 4,
+    "geoCenter": { "lat": 37.61, "lon": -118.98 },
     "summary": "A 38.4-mile loop over Duck Pass linking eight Mammoth Lakes Basin lakes (Emerald, Skelton, Arrowhead, Barney, Duck, Lake George, Lake Mary, Lake Barrett) with 19 miles of John Muir Trail along Deer Creek and Crater Creek. The route crosses Duck Pass twice and explores Woods Lakes, Red Lake, and Heart Lake on the return. You'll gain 12,824 ft across the trip.",
     "bestFor": "Strong intermediate backpackers seeking alpine lake variety and willing to trade John Muir Trail crowds for high-effort climbing over Duck Pass.",
     "segments": [

@@ -220,6 +220,7 @@ export function postProcess(claudeOutput, structuredInput) {
       totalGainFt: segments.reduce((s, d) => s + d.gainFt, 0),
       totalLossFt: segments.reduce((s, d) => s + d.lossFt, 0),
       days: route.itinerary.length,
+      geoCenter: cluster.geoCenter || null,
       summary: sanitizeDashes(route.summary),
       bestFor: sanitizeDashes(route.bestFor),
       segments,

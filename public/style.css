@@ -566,6 +566,68 @@ input:focus, select:focus {
 .site-footer a { color: var(--sky); text-decoration: none; }
 .site-footer a:hover { text-decoration: underline; }
 
+/* ── Route card body (map + text side by side) ── */
+.route-card-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  border-bottom: 1px solid var(--mist);
+}
+
+.route-map {
+  height: 200px;
+  background: var(--mist);
+  border-right: 1px solid var(--mist);
+  position: relative;
+  z-index: 0;
+}
+
+.route-map.map--no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: #9a8e80;
+}
+
+.route-text {
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Custom Leaflet marker */
+.route-marker {
+  background: none;
+  border: none;
+}
+
+.route-marker-inner {
+  width: 28px;
+  height: 28px;
+  background: var(--pine);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* ── Route summary / best-for (now inside .route-text) ── */
+.route-summary {
+  font-size: 0.9rem;
+  color: var(--trail);
+}
+
+.best-for {
+  font-size: 0.85rem;
+  color: var(--bark);
+}
+
+.best-for strong { color: var(--trail); }
+
 /* ── Field validation ── */
 input.field-error,
 select.field-error {
@@ -591,6 +653,8 @@ select.field-error {
   .route-card-header { flex-direction: column; }
   .route-stats { justify-content: flex-start; }
   .stat { align-items: flex-start; }
+  .route-card-body { grid-template-columns: 1fr; }
+  .route-map { border-right: none; border-bottom: 1px solid var(--mist); }
   .pros-cons { grid-template-columns: 1fr; }
   .pros { border-right: none; border-bottom: 1px solid var(--mist); }
 }
