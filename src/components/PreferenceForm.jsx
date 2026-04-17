@@ -43,6 +43,7 @@ export function PreferenceForm({ onBack, onSubmit, isLoading }) {
     avoid: '',
     priorities: '',
     notes: '',
+    startDate: '',
   });
 
   const update = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
@@ -119,6 +120,20 @@ export function PreferenceForm({ onBack, onSubmit, isLoading }) {
               style={inputBase}
             />
           </div>
+        </div>
+
+        {/* Start Date (optional) */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={labelStyle}>
+            Trip Start Date
+            <span style={{ fontWeight: 400, color: COLORS.stone400, marginLeft: 6 }}>(optional — enables weather)</span>
+          </label>
+          <input
+            type="date"
+            value={form.startDate}
+            onChange={(e) => update('startDate', e.target.value)}
+            style={inputBase}
+          />
         </div>
 
         {/* Elevation */}

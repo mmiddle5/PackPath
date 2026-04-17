@@ -2,9 +2,8 @@
 // Handles the full route request lifecycle:
 //   1. POST /api/routes → get jobId
 //   2. Poll GET /api/routes/:jobId every 2s until done/failed
-//   3. GET /api/routes/cached for demo mode
 //
-// Returns { routes, status, step, message, error, findRoutes, loadDemo, reset }
+// Returns { routes, status, step, message, error, findRoutes, reset }
 
 import { useState, useRef, useCallback } from 'react';
 
@@ -113,29 +112,5 @@ export function useRoutes() {
     }
   }, [pollJob]);
 
-  const loadDemo = useCallback(async () => {
-    setStatus('loading');
-    setStep(5);
-    setMessage('Loading demo routes…');
-    setError(null);
-
-    try {
-      const res = await fetch('/api/routes/cached');
-      const data = await res.json();
-
-      if (!res.ok) {
-        setStatus('failed');
-        setError(data.error ?? 'No demo routes available.');
-        return;
-      }
-
-      setRoutes(data.routes);
-      setStatus('done');
-    } catch (err) {
-      setStatus('failed');
-      setError(`Could not load demo: ${err.message}`);
-    }
-  }, []);
-
-  return { routes, status, step, message, error, findRoutes, loadDemo, reset };
+  return { routes, status, step, message, error, findRoutes, reset };
 }

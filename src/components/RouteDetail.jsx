@@ -3,6 +3,8 @@ import { fmt, fmtMi } from '../utils/hiking.js';
 import { ArchetypeTag } from './ArchetypeTag.jsx';
 import { StatBlock } from './StatBlock.jsx';
 import { DayCard } from './DayCard.jsx';
+import { MapView } from './MapView.jsx';
+import { WeatherPanel } from './WeatherPanel.jsx';
 
 /**
  * Full route detail view.
@@ -53,6 +55,12 @@ export function RouteDetail({ route, onBack }) {
           <StatBlock value={route.days}              unit=" d"  label="Days"  size="lg" light />
         </div>
       </div>
+
+      {/* Map + export actions */}
+      <MapView route={route} />
+
+      {/* Weather */}
+      {route.weather && <WeatherPanel weather={route.weather} />}
 
       {/* Day-by-day itinerary */}
       <h3 style={{ fontSize: 16, fontWeight: 700, color: COLORS.stone700, marginBottom: 12 }}>
@@ -119,50 +127,6 @@ export function RouteDetail({ route, onBack }) {
             <span>{tip}</span>
           </div>
         ))}
-      </div>
-
-      {/* GPX Export — placeholder until pipeline provides coordinates */}
-      <div style={{
-        marginTop: 16,
-        padding: 16,
-        borderRadius: 10,
-        background: COLORS.stone100,
-        border: `1px solid ${COLORS.stone200}`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 16 }}>📥</span>
-          <h4 style={{ fontSize: 14, fontWeight: 700, color: COLORS.stone700, margin: 0 }}>
-            Export Route
-          </h4>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Download GPX', icon: '↓' },
-            { label: 'Open in Gaia GPS', icon: '⛰' },
-            { label: 'Open in OnX Backcountry', icon: '▪' },
-          ].map((btn) => (
-            <button key={btn.label} disabled style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '10px 14px',
-              borderRadius: 8,
-              background: '#fff',
-              border: `1px solid ${COLORS.stone300}`,
-              fontSize: 13,
-              fontWeight: 600,
-              color: COLORS.stone400,
-              cursor: 'not-allowed',
-              opacity: 0.55,
-            }}>
-              <span style={{ fontSize: 14 }}>{btn.icon}</span>
-              {btn.label}
-            </button>
-          ))}
-        </div>
-        <p style={{ fontSize: 12, color: COLORS.stone400, margin: '10px 0 0 0', lineHeight: 1.4 }}>
-          GPX export requires trail coordinates from the pipeline. Coming in a future update.
-        </p>
       </div>
     </div>
   );
