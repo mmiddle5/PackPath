@@ -576,11 +576,29 @@ async function main() {
     const rep = sig.rep;
     const rawRepLoop = uniqueLoops[rep._idx];
 
-    // Serialize representative loop segments for narration input
+    // Serialize representative loop segments for narration input.
+    // coords: sampled lat/lon array for map rendering (max 20 points per segment,
+    // direction-aware so the polyline traces the actual walking direction).
+    const MAX_COORDS_PER_SEG = 20;
     const segments = rawRepLoop.segList.map(({ seg, fromNode }) => {
       const midIdx = Math.floor(seg.nodeIds.length / 2);
       const midNode = graph.nodes.get(seg.nodeIds[midIdx]);
       const forward = fromNode === seg.startNode;
+
+      // Sample up to MAX_COORDS_PER_SEG evenly-spaced nodes from the segment.
+      const nodeIds = forward ? seg.nodeIds : [...seg.nodeIds].reverse();
+      const step = Math.max(1, Math.floor(nodeIds.length / MAX_COORDS_PER_SEG));
+      const sampledIds = [];
+      for (let si = 0; si < nodeIds.length; si += step) sampledIds.push(nodeIds[si]);
+      // Always include the last node so segments connect end-to-end.
+      if (sampledIds[sampledIds.length - 1] !== nodeIds[nodeIds.length - 1]) {
+        sampledIds.push(nodeIds[nodeIds.length - 1]);
+      }
+      const coords = sampledIds
+        .map(nid => graph.nodes.get(nid))
+        .filter(Boolean)
+        .map(n => [n.lat, n.lon]);
+
       return {
         trailName: seg.name || '(unnamed)',
         lengthMi: seg.lengthMi,
@@ -589,6 +607,7 @@ async function main() {
         fromJunction: junctionLabel(fromNode),
         toJunction: junctionLabel(seg.startNode === fromNode ? seg.endNode : seg.startNode),
         midpoint: midNode ? { lat: midNode.lat, lon: midNode.lon } : null,
+        coords,
         peaks: [...new Set((seg.nearbyPeaks || []).map(f => f.name).filter(Boolean))],
         passes: [...new Set((seg.nearbyPasses || []).map(f => f.name).filter(Boolean))],
         lakes: [...new Set((seg.nearbyLakes || []).map(f => f.name).filter(Boolean))],

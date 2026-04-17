@@ -5,7 +5,6 @@
 // Routes:
 //   GET  /api/regions          — list available regions
 //   POST /api/routes           — create a background job, returns { jobId, status }
-//   GET  /api/routes/cached    — return the last validated output (no API cost)
 //   GET  /api/routes/:jobId    — poll job status and result
 //   GET  /                     — serve the frontend
 
@@ -104,26 +103,6 @@ app.get('/api/regions', async (req, res) => {
         })
     );
     res.json({ regions });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ── GET /api/routes/cached ────────────────────────────────────────────
-// Returns the last validated output without calling Claude.
-// Useful for development and demos.
-// NOTE: This route must be defined before GET /api/routes/:jobId so Express
-// doesn't treat "cached" as a jobId.
-app.get('/api/routes/cached', async (req, res) => {
-  const outputPath = path.join(__dirname, 'narration-output-real.json');
-  if (!existsSync(outputPath)) {
-    return res.status(404).json({
-      error: 'No cached output found. Run the pipeline first with POST /api/routes or npm run pipeline.'
-    });
-  }
-  try {
-    const output = JSON.parse(await fs.readFile(outputPath, 'utf-8'));
-    res.json({ routes: output, cached: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -270,16 +249,28 @@ async function runPipeline(jobId, preferences, regionName) {
     // Step 5: Persist and mark done
     updateJob(jobId, { step: 5, message: 'Validating output…' });
 
+    // Step 6: Fetch weather for each route (non-blocking — failures are tolerated)
+    updateJob(jobId, { step: 5, message: 'Fetching weather data…' });
+    const weatherResults = await Promise.allSettled(
+      finalOutput.map(route =>
+        fetchWeatherForRoute(route.geoCenter, preferences.startDate, preferences.daysTarget)
+      )
+    );
+    const finalOutputWithWeather = finalOutput.map((route, i) => ({
+      ...route,
+      weather: weatherResults[i].status === 'fulfilled' ? weatherResults[i].value : null,
+    }));
+
     await fs.writeFile(
       path.join(__dirname, 'narration-output-real.json'),
-      JSON.stringify(finalOutput, null, 2)
+      JSON.stringify(finalOutputWithWeather, null, 2)
     );
 
     updateJob(jobId, {
       status: 'done',
       step: 5,
       message: 'Done',
-      routes: finalOutput,
+      routes: finalOutputWithWeather,
       validated: validationResult?.ok ?? false,
       attempts: attempt,
     });
@@ -308,7 +299,122 @@ function validatePreferences(prefs) {
   if (!Array.isArray(prefs.sceneryPreferences) || prefs.sceneryPreferences.length === 0) {
     errors.push('sceneryPreferences must be a non-empty array');
   }
+  if (prefs.startDate !== undefined && prefs.startDate !== null && prefs.startDate !== '') {
+    const d = new Date(prefs.startDate);
+    if (isNaN(d.getTime())) {
+      errors.push('startDate must be a valid ISO date string (YYYY-MM-DD)');
+    }
+  }
   return errors;
+}
+
+// ── Weather fetch (Open-Meteo — free, no API key) ─────────────────────
+// For dates within 16 days: real forecast.
+// For dates further out or no date: historical climate averages for that
+// calendar week using the Open-Meteo climate API.
+const WEATHER_TIMEOUT_MS = 10_000;
+
+async function fetchWeatherForRoute(geoCenter, startDate, daysTarget) {
+  if (!geoCenter) return null;
+  const { lat, lon } = geoCenter;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), WEATHER_TIMEOUT_MS);
+
+    let weatherData;
+    const today = new Date();
+    const tripStart = startDate ? new Date(startDate) : null;
+    const daysUntilTrip = tripStart ? Math.ceil((tripStart - today) / (1000 * 60 * 60 * 24)) : null;
+    const useForecast = daysUntilTrip !== null && daysUntilTrip >= 0 && daysUntilTrip <= 16;
+
+    try {
+      if (useForecast) {
+        // Real forecast from Open-Meteo
+        const endDate = new Date(tripStart);
+        endDate.setDate(endDate.getDate() + daysTarget - 1);
+        const fmt = d => d.toISOString().split('T')[0];
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode,windspeed_10m_max&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&start_date=${fmt(tripStart)}&end_date=${fmt(endDate)}&timezone=America%2FLos_Angeles`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Open-Meteo forecast ${res.status}`);
+        const json = await res.json();
+        weatherData = parseForecastResponse(json, daysTarget);
+        weatherData.source = 'forecast';
+        weatherData.startDate = fmt(tripStart);
+      } else {
+        // Historical climate normals — use the target week of year
+        const refDate = tripStart || today;
+        const month = String(refDate.getMonth() + 1).padStart(2, '0');
+        const day = String(refDate.getDate()).padStart(2, '0');
+        // Open-Meteo climate API: 30-year normals
+        const url = `https://climate-api.open-meteo.com/v1/climate?latitude=${lat}&longitude=${lon}&start_date=1991-${month}-${day}&end_date=2020-${month}-${day}&models=EC_Earth3P_HR&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&temperature_unit=fahrenheit&precipitation_unit=inch`;
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error(`Open-Meteo climate ${res.status}`);
+        const json = await res.json();
+        weatherData = parseClimateResponse(json);
+        weatherData.source = 'climate_normals';
+        weatherData.referenceDate = `${month}-${day}`;
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    return weatherData;
+  } catch (err) {
+    // Weather is non-critical — log and return null rather than failing the job
+    console.warn(`Weather fetch failed for ${lat},${lon}: ${err.message}`);
+    return null;
+  }
+}
+
+function parseForecastResponse(json, daysTarget) {
+  const daily = json.daily || {};
+  const dates = daily.time || [];
+  const days = [];
+  for (let i = 0; i < Math.min(dates.length, daysTarget); i++) {
+    days.push({
+      date: dates[i],
+      tempHighF: daily.temperature_2m_max?.[i] ?? null,
+      tempLowF: daily.temperature_2m_min?.[i] ?? null,
+      precipIn: daily.precipitation_sum?.[i] ?? null,
+      windMph: daily.windspeed_10m_max?.[i] ?? null,
+      weatherCode: daily.weathercode?.[i] ?? null,
+      description: wmoDescription(daily.weathercode?.[i]),
+    });
+  }
+  return { days, elevation: json.elevation ?? null };
+}
+
+function parseClimateResponse(json) {
+  const daily = json.daily || {};
+  const tempHighs = daily.temperature_2m_max || [];
+  const tempLows = daily.temperature_2m_min || [];
+  const precips = daily.precipitation_sum || [];
+  const avgHigh = tempHighs.length ? Math.round(tempHighs.reduce((a, b) => a + b, 0) / tempHighs.length) : null;
+  const avgLow = tempLows.length ? Math.round(tempLows.reduce((a, b) => a + b, 0) / tempLows.length) : null;
+  const avgPrecip = precips.length ? Number((precips.reduce((a, b) => a + b, 0) / precips.length).toFixed(2)) : null;
+  return {
+    avgHighF: avgHigh,
+    avgLowF: avgLow,
+    avgPrecipIn: avgPrecip,
+    elevation: json.elevation ?? null,
+    days: null,
+  };
+}
+
+// WMO Weather Interpretation Codes → human description
+function wmoDescription(code) {
+  if (code === null || code === undefined) return null;
+  if (code === 0) return 'Clear sky';
+  if (code <= 2) return 'Partly cloudy';
+  if (code === 3) return 'Overcast';
+  if (code <= 49) return 'Fog';
+  if (code <= 59) return 'Drizzle';
+  if (code <= 69) return 'Rain';
+  if (code <= 79) return 'Snow';
+  if (code <= 84) return 'Rain showers';
+  if (code <= 94) return 'Thunderstorm';
+  return 'Severe thunderstorm';
 }
 
 // ── Claude API call ───────────────────────────────────────────────────
@@ -366,5 +472,4 @@ function extractJSON(text) {
 app.listen(PORT, () => {
   console.log(`PackPath server running at http://localhost:${PORT}`);
   console.log(`API key: ${API_KEY ? 'set ✓' : 'NOT SET — set ANTHROPIC_API_KEY to run the pipeline'}`);
-  console.log(`Cached output: ${existsSync(path.join(__dirname, 'narration-output-real.json')) ? 'available ✓' : 'none — run pipeline first'}`);
 });

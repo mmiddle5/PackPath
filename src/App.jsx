@@ -19,7 +19,7 @@ export default function App() {
   const [view, setView] = useState('picker'); // picker | detail | prefs
   const [selectedRoute, setSelectedRoute] = useState(null);
 
-  const { routes, status, step, message, error, findRoutes, loadDemo, reset } = useRoutes();
+  const { routes, status, step, message, error, findRoutes, reset } = useRoutes();
 
   const openRoute = (route) => { setSelectedRoute(route); setView('detail'); };
   const goHome    = () => { setView('picker'); setSelectedRoute(null); };
@@ -179,25 +179,9 @@ export default function App() {
               textAlign: 'center',
               marginBottom: 16,
             }}>
-              <p style={{ fontSize: 15, color: COLORS.stone500, margin: '0 0 16px 0' }}>
-                No routes loaded yet.
+              <p style={{ fontSize: 15, color: COLORS.stone500, margin: 0 }}>
+                Set your trip preferences to find routes.
               </p>
-              <button
-                onClick={loadDemo}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: COLORS.emerald600,
-                  color: '#fff',
-                  border: 'none',
-                  marginRight: 8,
-                }}
-              >
-                Load demo routes
-              </button>
             </div>
           )}
 
@@ -223,28 +207,6 @@ export default function App() {
             >
               <span style={{ fontSize: 18 }}>⚙</span> Set trip preferences
             </button>
-            {!displayRoutes && status !== 'loading' && (
-              <button
-                onClick={loadDemo}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '14px 0',
-                  borderRadius: 10,
-                  background: 'none',
-                  border: `1px solid ${COLORS.stone200}`,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: COLORS.stone500,
-                }}
-              >
-                Load demo
-              </button>
-            )}
           </div>
         </>
       )}

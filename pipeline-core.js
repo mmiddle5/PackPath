@@ -47,6 +47,7 @@ export function buildNarrationInput(rankedClusters, preferences, archetypeFn = a
         fromJunction: seg.fromJunction,
         toJunction: seg.toJunction,
         midpoint: seg.midpoint,
+        coords: seg.coords || [],
         peaks: seg.peaks,
         passes: seg.passes,
         lakes: seg.lakes,
@@ -200,6 +201,19 @@ export function postProcess(claudeOutput, structuredInput) {
       }
 
       routeMileSum += dayMiles;
+
+      // Collect ordered coords for this day's segments (for map rendering).
+      // Each segment's coords array is already direction-aware from find-loops.js.
+      const dayCoords = [];
+      for (const idx of daySegIds) {
+        const seg = cluster.segments[idx];
+        if (!seg || !seg.coords) continue;
+        for (const pt of seg.coords) {
+          const last = dayCoords[dayCoords.length - 1];
+          if (!last || last[0] !== pt[0] || last[1] !== pt[1]) dayCoords.push(pt);
+        }
+      }
+
       segments.push({
         day: dayEntry.day,
         segmentIds: daySegIds,
@@ -209,8 +223,12 @@ export function postProcess(claudeOutput, structuredInput) {
         lossFt: dayLossFt,
         note: sanitizeDashes(dayEntry.note),
         features: dayFeatures,
+        coords: dayCoords,
       });
     }
+
+    // Derive trailhead coordinate from the first point of the first day's coords.
+    const trailheadCoord = segments[0]?.coords?.[0] ?? null;
 
     result.push({
       routeName: sanitizeDashes(route.routeName),
@@ -221,6 +239,7 @@ export function postProcess(claudeOutput, structuredInput) {
       totalLossFt: segments.reduce((s, d) => s + d.lossFt, 0),
       days: route.itinerary.length,
       geoCenter: cluster.geoCenter || null,
+      trailheadCoord,
       summary: sanitizeDashes(route.summary),
       bestFor: sanitizeDashes(route.bestFor),
       segments,
